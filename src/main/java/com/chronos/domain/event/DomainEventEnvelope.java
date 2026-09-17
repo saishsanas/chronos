@@ -31,4 +31,28 @@ public record DomainEventEnvelope(
         Objects.requireNonNull(metadata, "metadata must not be null");
         Objects.requireNonNull(payload, "payload must not be null");
     }
+
+    public String getPayloadString(String fieldName) {
+        JsonNode node = payload.get(fieldName);
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        return node.asText();
+    }
+
+    public long getPayloadLong(String fieldName) {
+        JsonNode node = payload.get(fieldName);
+        if (node == null || node.isNull()) {
+            return 0L;
+        }
+        return node.asLong();
+    }
+
+    public UUID getPayloadUUID(String fieldName) {
+        String val = getPayloadString(fieldName);
+        if (val == null) {
+            return null;
+        }
+        return UUID.fromString(val);
+    }
 }
