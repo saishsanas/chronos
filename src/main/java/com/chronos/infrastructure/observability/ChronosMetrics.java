@@ -50,6 +50,30 @@ public class ChronosMetrics {
         meterRegistry.counter("chronos.inbox.failed").increment();
     }
 
+    public void recordProjectionProcessed() {
+        meterRegistry.counter("chronos.projection.processed").increment();
+    }
+
+    public void recordProjectionFailed() {
+        meterRegistry.counter("chronos.projection.failed").increment();
+    }
+
+    public void recordProjectionDuplicate() {
+        meterRegistry.counter("chronos.projection.duplicates").increment();
+    }
+
+    public void recordCacheHit() {
+        meterRegistry.counter("chronos.cache.hit").increment();
+    }
+
+    public void recordCacheMiss() {
+        meterRegistry.counter("chronos.cache.miss").increment();
+    }
+
+    public void recordCacheFailure() {
+        meterRegistry.counter("chronos.cache.failure").increment();
+    }
+
     private String sanitize(String input) {
         if (input == null || input.isBlank()) return "UNKNOWN";
         return input.replaceAll("[^a-zA-Z0-9_.-]", "_");

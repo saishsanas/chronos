@@ -25,23 +25,28 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
+import com.chronos.application.service.AccountSummaryQueryService;
+
 @RestController
 @RequestMapping("/api/v1/accounts")
-@Tag(name = "Account Temporal API", description = "Commands, Current State, Historical Replay, and Event History APIs for Chronos Engine")
+@Tag(name = "Account Temporal API", description = "Commands, Current State, Historical Replay, CQRS Read Model, and Event History APIs for Chronos Engine")
 public class AccountController {
 
     private final AccountCommandProcessor commandProcessor;
     private final TemporalStateReconstructor temporalReconstructor;
     private final EventStore eventStore;
+    private final AccountSummaryQueryService summaryQueryService;
 
     public AccountController(
         AccountCommandProcessor commandProcessor,
         TemporalStateReconstructor temporalReconstructor,
-        EventStore eventStore
+        EventStore eventStore,
+        AccountSummaryQueryService summaryQueryService
     ) {
         this.commandProcessor = Objects.requireNonNull(commandProcessor, "commandProcessor must not be null");
         this.temporalReconstructor = Objects.requireNonNull(temporalReconstructor, "temporalReconstructor must not be null");
         this.eventStore = Objects.requireNonNull(eventStore, "eventStore must not be null");
+        this.summaryQueryService = Objects.requireNonNull(summaryQueryService, "summaryQueryService must not be null");
     }
 
     @PostMapping
@@ -216,6 +221,13 @@ public class AccountController {
             .map(EventEnvelopeResponse::fromDomain)
             .toList();
         return ResponseEntity.ok(responses);
+    }
+
+    @GetMapping("/{accountId}/summary")
+    @Operation(summary = "Get CQRS account summary", description = "Returns fast read-model summary via Redis cache with PostgreSQL projection fallback")
+    public ResponseEntity<AccountSummaryResponse> getAccountSummary(@PathVariable UUID accountId) {
+        AccountSummaryResponse response = summaryQueryService.getAccountSummary(accountId);
+        return ResponseEntity.ok(response);
     }
 
     private CommandContext createContext(String idempotencyHeader, String correlationHeader, String causationHeader) {
