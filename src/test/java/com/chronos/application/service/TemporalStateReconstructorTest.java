@@ -183,4 +183,72 @@ class TemporalStateReconstructorTest {
         assertThat(snapshotResult.snapshotSequenceNumber()).isEqualTo(200L);
         assertThat(snapshotResult.eventsReplayedCount()).isEqualTo(50);
     }
+
+    @Test
+    @DisplayName("Audit Fix: Snapshot represented state timestamp is used for stateAt(T) eligibility")
+    void testSnapshotRepresentedStateTemporalFiltering() {
+        UUID accountId = UUID.randomUUID();
+        CommandContext ctx = CommandContext.of("admin");
+
+        CommandResult res1 = commandProcessor.process(new CreateAccount(accountId, "INR", 10000L, 50000L), ctx);
+        Instant t1 = res1.emittedEvents().get(0).recordedAt();
+
+        CommandResult res2 = commandProcessor.process(new DepositMoney(accountId, 5000L), ctx);
+        Instant t2 = res2.emittedEvents().get(0).recordedAt();
+
+        // State at sequence 2 has lastUpdatedAt = t2
+        AccountState state2 = res2.resultingState();
+
+        // Create snapshot at a much LATER physical creation time (t2 + 1 hour)
+        Snapshot snapshotDelayed = new Snapshot(
+                UUID.randomUUID(), accountId, 2L, 1, 1, Snapshot.CURRENT_REPLAY_LOGIC_HASH, t2.plusSeconds(3600), state2
+        );
+        snapshotRepository.save(snapshotDelayed);
+
+        // Querying stateAt(t2) must match snapshot represented state (t2 <= t2) even though createdAt > t2
+        TemporalResult resultAtT2 = temporalReconstructor.reconstructStateAt(accountId, t2);
+        assertThat(resultAtT2.snapshotUsed()).isTrue();
+        assertThat(resultAtT2.snapshotSequenceNumber()).isEqualTo(2L);
+        assertThat(resultAtT2.reconstructedState().balanceMinor()).isEqualTo(5000L);
+
+        // Querying stateAt(t1) must NOT match snapshot 2 because state2.lastUpdatedAt (t2) > t1
+        TemporalResult resultAtT1 = temporalReconstructor.reconstructStateAt(accountId, t1);
+        assertThat(resultAtT1.snapshotSequenceNumber()).isNotEqualTo(2L);
+        assertThat(resultAtT1.reconstructedState().balanceMinor()).isEqualTo(0L);
+    }
+
+    @Test
+    @DisplayName("Audit Fix: Snapshot persistence failure does not invalidate command result or event store")
+    void testSnapshotSaveFailureDoesNotInvalidateCommandResult() {
+        UUID accountId = UUID.randomUUID();
+        CommandContext ctx = CommandContext.of("admin");
+
+        // Custom processor with a snapshot repository that throws an exception
+        SnapshotRepository failingRepo = new SnapshotRepository() {
+            @Override
+            public void save(Snapshot snapshot) {
+                throw new RuntimeException("Database disk full");
+            }
+            @Override
+            public java.util.Optional<Snapshot> findLatestForAggregate(UUID aggregateId) { return java.util.Optional.empty(); }
+            @Override
+            public java.util.Optional<Snapshot> findLatestAtOrBeforeSequence(UUID aggregateId, long sequenceNumber) { return java.util.Optional.empty(); }
+            @Override
+            public java.util.Optional<Snapshot> findLatestAtOrBeforeTimestamp(UUID aggregateId, Instant timestamp) { return java.util.Optional.empty(); }
+        };
+
+        AccountCommandProcessor processorWithFailingRepo = new AccountCommandProcessor(eventStore, new com.fasterxml.jackson.databind.ObjectMapper(), failingRepo, 1);
+
+        // Process command that triggers snapshot interval = 1
+        CommandResult result = processorWithFailingRepo.process(new CreateAccount(accountId, "INR", 10000L, 50000L), ctx);
+
+        // Command succeeds despite snapshot failure
+        assertThat(result.resultingState().status()).isEqualTo(AccountStatus.ACTIVE);
+        assertThat(eventStore.currentVersion(accountId)).isEqualTo(1L);
+
+        // State is reconstructable from event store
+        TemporalResult reconstructed = temporalReconstructor.reconstructCurrentState(accountId);
+        assertThat(reconstructed.reconstructedState().accountId()).isEqualTo(accountId);
+    }
 }
+

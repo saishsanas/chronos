@@ -104,13 +104,13 @@ public class PostgresSnapshotRepository implements SnapshotRepository {
         Objects.requireNonNull(aggregateId, "aggregateId must not be null");
         Objects.requireNonNull(timestamp, "timestamp must not be null");
 
-        // Note: A snapshot at sequence N represents state after event N.
-        // We match snapshots whose state lastUpdatedAt is <= timestamp.
+        // A snapshot represents event state history up to state.lastUpdatedAt.
+        // We match snapshots whose represented state.lastUpdatedAt is <= timestamp.
         String sql = """
             SELECT snapshot_id, aggregate_id, sequence_number, snapshot_version,
                    domain_version, replay_logic_hash, created_at, state_payload
             FROM snapshots
-            WHERE aggregate_id = ? AND created_at <= ?
+            WHERE aggregate_id = ? AND (state_payload ->> 'lastUpdatedAt')::timestamptz <= ?
             ORDER BY sequence_number DESC
             LIMIT 1
             """;
@@ -118,6 +118,7 @@ public class PostgresSnapshotRepository implements SnapshotRepository {
         List<Snapshot> results = jdbcTemplate.query(sql, new SnapshotRowMapper(objectMapper), aggregateId, Timestamp.from(timestamp));
         return results.stream().findFirst();
     }
+
 
     private String toJsonString(Object obj) {
         try {
