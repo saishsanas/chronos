@@ -1,16 +1,13 @@
 # Stage 1: Build JAR using Maven
-FROM eclipse-temurin:21-jdk AS builder
+FROM maven:3.9-eclipse-temurin-21 AS builder
 WORKDIR /build
 
-# Copy Maven POM and wrapper files for layer caching
+# Copy Maven POM first for layer caching
 COPY pom.xml ./
-COPY .mvn .mvn
-COPY mvnw ./
-RUN chmod +x mvnw || true
 
-# Copy source code and build executable jar
+# Copy source code and build executable JAR
 COPY src ./src
-RUN ./mvnw clean package -DskipTests || mvn clean package -DskipTests
+RUN mvn -B clean package -DskipTests
 
 # Stage 2: Runtime image
 FROM eclipse-temurin:21-jre
