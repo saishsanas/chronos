@@ -33,10 +33,7 @@ class AccountCommandProcessorTest {
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", () -> "jdbc:postgresql://localhost:5432/chronos_test_db");
-        registry.add("spring.datasource.username", () -> "test_user");
-        registry.add("spring.datasource.password", () -> "test_password");
-        registry.add("spring.flyway.locations", () -> "classpath:db/migration");
+        com.chronos.TestDatabaseHelper.configureProperties(registry);
     }
 
     @Autowired
