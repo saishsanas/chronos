@@ -1,16 +1,18 @@
-# Chronos Engine
-> **Time-Traveling State Reconstruction Engine with Transactional Event Sourcing, Asynchronous Kafka Broadcast, and Idempotent Consumer Processing.**
+# Chronos Engine v1.0
+> **Time-Traveling State Reconstruction Engine with Transactional Event Sourcing, Asynchronous Kafka Broadcast, CQRS Read Model Caching, and React Temporal Visualization Dashboard.**
 
 [![Build & Test](https://github.com/saish/chronos-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/saish/chronos-engine/actions/workflows/ci.yml)
 [![Java 21](https://img.shields.io/badge/Java-21-orange.svg)](https://openjdk.org/projects/jdk/21/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3.4-brightgreen.svg)](https://spring.io/projects/spring-boot)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
 [![Kafka](https://img.shields.io/badge/Apache%20Kafka-7.6.0-black.svg)](https://kafka.apache.org/)
+[![Redis](https://img.shields.io/badge/Redis-7-red.svg)](https://redis.io/)
+[![React](https://img.shields.io/badge/React-19-cyan.svg)](https://react.dev/)
 
 ---
 
 ## 1. Project Purpose
-Traditional CRUD financial applications suffer from state mutability, audit trail destruction, and lack of temporal visibility into historical system states. **Chronos** solves these challenges by implementing an immutable **Event Sourcing** architecture with **Snapshot Optimization**, **Transactional Outbox Messaging**, **Idempotent Kafka Consumer Processing**, and **Inclusive Temporal State Reconstruction (`stateAt(T)`)**.
+Traditional CRUD financial applications suffer from state mutability, audit trail destruction, and lack of temporal visibility into historical system states. **Chronos** solves these challenges by implementing an immutable **Event Sourcing** architecture with **Snapshot Optimization**, **Transactional Outbox Messaging**, **Idempotent Kafka Consumer Processing**, **CQRS Read Model Projections with Redis Caching**, and **Inclusive Temporal State Reconstruction (`stateAt(T)`)** served via a **Dark-First React Observability Dashboard**.
 
 ---
 
@@ -18,19 +20,29 @@ Traditional CRUD financial applications suffer from state mutability, audit trai
 
 ```mermaid
 flowchart TD
-    subgraph ClientLayer ["Client / Consumer Boundary"]
-        Client["Client / API Consumer"]
+    subgraph UI ["React Temporal Visualization Frontend"]
+        Dashboard["Dashboard UI (React / Vite / Tailwind)"]
+        Inspector["Temporal Replay Inspector (stateAt T)"]
+        Timeline["Event Stream Timeline"]
     end
 
     subgraph API ["Spring MVC REST API"]
         Controller["AccountController"]
         Filter["MdcCorrelationFilter"]
+        WebConfig["CORS & WebConfig"]
     end
 
     subgraph DomainApp ["Application & Domain Engine"]
         Processor["AccountCommandProcessor"]
         Reducer["AccountReducer"]
         Reconstructor["TemporalStateReconstructor"]
+        SummaryService["AccountSummaryQueryService"]
+    end
+
+    subgraph ReadModel ["CQRS Read Model & Caching"]
+        RedisCache[("Redis Cache (60s TTL)")]
+        ReadProjection[("account_summary_projection")]
+        ProjectionHandler["AccountProjectionHandler"]
     end
 
     subgraph Persistence ["PostgreSQL Storage Layer"]
@@ -47,21 +59,31 @@ flowchart TD
         InboxConsumer["KafkaEventConsumer (Manual Ack)"]
     end
 
-    Client -->|HTTP POST/GET| Filter
+    Dashboard -->|HTTP REST| Filter
     Filter --> Controller
     Controller -->|Commands| Processor
     Controller -->|Temporal Queries| Reconstructor
+    Controller -->|CQRS Summary| SummaryService
+
+    SummaryService -->|1. Cache Read| RedisCache
+    SummaryService -->|2. Fallback Read| ReadProjection
+
     Processor -->|Load Stream| EventStore
     Processor -->|Apply Events| Reducer
     Processor -->|Atomic Write| EventStore
     Processor -->|Atomic Write| OutboxTable
+
     Reconstructor -->|Select Latest Snapshot| Snapshots
     Reconstructor -->|Replay recordedAt <= T| EventStore
+
     OutboxTable -->|Poll FOR UPDATE SKIP LOCKED| OutboxRelay
     OutboxRelay -->|Broadcast JSON Envelope| KafkaBus
+
     KafkaBus -->|At-Least-Once Delivery| InboxConsumer
     InboxConsumer -->|Deduplicate & Validate| InboxTable
-    InboxConsumer -->|Verify Sequence Continuity| SeqTable
+    InboxConsumer -->|Update CQRS Read Model| ProjectionHandler
+    ProjectionHandler -->|Write Projection| ReadProjection
+    ProjectionHandler -->|Invalidate/Write Cache| RedisCache
 ```
 
 ---
@@ -76,18 +98,18 @@ flowchart TD
 | **Atomic Outbox Publication** | `event_store` and `outbox_events` are populated in **one single PostgreSQL database transaction**. |
 | **Lock-Free Outbox Polling** | Outbox relay uses `FOR UPDATE SKIP LOCKED` for non-blocking concurrent worker scaling. |
 | **Idempotent Kafka Consumption** | `inbox_events` table with unique `event_id` constraint guarantees **no duplicate business execution**. |
-| **Sequence Continuity Validation** | `consumer_aggregate_state` detects sequence gaps, regressions, and collisions. |
+| **CQRS Read Model Caching** | Low-latency `GET /summary` query via Redis cache (60s TTL) with automatic fallback to PostgreSQL. |
+| **Visual Temporal Audit** | React frontend provides interactive time-travel replay, sequence timeline, and JSON envelope inspection. |
 
 ---
 
 ## 4. Technology Stack
-- **Language:** Java 21 LTS
-- **Framework:** Spring Boot 3.3.4 (Spring MVC, JDBC, Kafka, Validation, Actuator)
-- **Database & Migration:** PostgreSQL 16.15, Flyway Migration (`V1` to `V4`)
-- **Messaging:** Apache Kafka 7.6.0 (KRaft mode)
-- **Documentation:** SpringDoc OpenAPI 2.6.0 (Swagger UI)
-- **Observability:** Micrometer, SLF4J MDC Correlation Filter
-- **Containers & CI:** Docker, Docker Compose, GitHub Actions
+- **Backend:** Java 21 LTS, Spring Boot 3.3.4 (MVC, JDBC, Kafka, Redis, Actuator, Validation)
+- **Frontend:** React 19, Vite, TypeScript 5.6, Tailwind CSS, Lucide Icons
+- **Database & Migration:** PostgreSQL 16, Flyway Migration (`V1` to `V5`)
+- **Messaging & Cache:** Apache Kafka 7.6.0 (KRaft mode), Redis 7
+- **Documentation & Metrics:** SpringDoc OpenAPI 2.6.0 (Swagger UI), Micrometer Telemetry
+- **Containerization & CI:** Docker, Docker Compose, GitHub Actions
 
 ---
 
@@ -106,29 +128,19 @@ flowchart TD
 
 ### Query & Temporal Endpoints
 - `GET /api/v1/accounts/{id}` — Reconstruct current state from snapshot and event stream
+- `GET /api/v1/accounts/{id}/summary` — CQRS read model summary (Redis cached with PostgreSQL fallback)
 - `GET /api/v1/accounts/{id}/state-at?at=<ISO-8601>` — Reconstruct historical state at timestamp $T$ (`recordedAt <= T`)
 - `GET /api/v1/accounts/{id}/events` — Fetch full immutable event history (`ORDER BY sequenceNumber ASC`)
-
-### Request Headers
-- `X-Correlation-Id` (Optional): Propagates operational correlation ID into logs and event metadata.
-- `Idempotency-Key` (Optional): Propagates client idempotency key into event metadata.
 
 ---
 
 ## 6. Observability & Telemetry
 
-### Spring Boot Actuator
-- Health Check: [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health)
-- Liveness Probe: `http://localhost:8080/actuator/health/liveness`
-- Readiness Probe: `http://localhost:8080/actuator/health/readiness`
-- Operational Metrics: [http://localhost:8080/actuator/metrics](http://localhost:8080/actuator/metrics)
-
-### Custom Micrometer Metrics
-- `chronos.commands.processed`: Counter for successful commands (tag: `command`)
-- `chronos.commands.failed`: Counter for failed commands (tags: `command`, `outcome`)
-- `chronos.temporal.reconstruction`: Counter for temporal state queries (tag: `snapshotUsed`)
-- `chronos.outbox.published`: Counter for successfully published outbox events
-- `chronos.inbox.duplicates`: Counter for suppressed duplicate Kafka deliveries
+### Spring Boot Actuator & UI Dashboard
+- **React UI Dashboard:** [http://localhost:5173](http://localhost:5173) (or Docker container port `5173`)
+- **Swagger UI:** [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
+- **Health Check:** [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health)
+- **Operational Metrics:** [http://localhost:8080/actuator/metrics](http://localhost:8080/actuator/metrics)
 
 ---
 
@@ -136,30 +148,31 @@ flowchart TD
 
 ### Prerequisites
 - JDK 21
+- Node.js v22+ & npm 10+
 - Maven 3.9+
-- Docker & Docker Compose (optional for local container execution)
+- Docker & Docker Compose
 
-### 1. Run Unit & Integration Tests
+### 1. Run Backend Unit & Integration Tests (97 Passing Tests)
 ```bash
+$env:JAVA_HOME="C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot\"
 mvn clean test
 ```
 
-### 2. Run Locally via Docker Compose
+### 2. Run Frontend Build
+```bash
+cd frontend
+npm install
+npm run build
+```
+
+### 3. Run Full System via Docker Compose
 ```bash
 docker compose up --build
 ```
 Once started, access:
+- **Temporal Dashboard UI:** [http://localhost:5173](http://localhost:5173)
 - **Swagger UI:** [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
-- **OpenAPI Spec:** [http://localhost:8080/v3/api-docs](http://localhost:8080/v3/api-docs)
-- **Actuator Health:** [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health)
-
-### 3. Demo Walkthrough Sequence (via Swagger UI or cURL)
-1. **Create Account:** `POST /api/v1/accounts` with payload `{"currency":"INR", "initialOverdraftLimitMinor":10000, "initialTransactionLimitMinor":50000}`.
-2. **Deposit:** `POST /api/v1/accounts/{id}/deposits` with payload `{"amountMinor": 25000}`.
-3. **Withdraw:** `POST /api/v1/accounts/{id}/withdrawals` with payload `{"amountMinor": 5000}`.
-4. **Query Current State:** `GET /api/v1/accounts/{id}` $\rightarrow$ Balance shows `20000`.
-5. **Query Historical State:** `GET /api/v1/accounts/{id}/state-at?at=<TIMESTAMP_BEFORE_WITHDRAWAL>` $\rightarrow$ Balance shows `25000`.
-6. **View Event Stream:** `GET /api/v1/accounts/{id}/events` $\rightarrow$ Lists all domain event envelopes.
+- **Backend Actuator Health:** [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health)
 
 ---
 

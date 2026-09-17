@@ -27,6 +27,7 @@ import java.util.UUID;
 
 import com.chronos.application.service.AccountSummaryQueryService;
 
+@CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/api/v1/accounts")
 @Tag(name = "Account Temporal API", description = "Commands, Current State, Historical Replay, CQRS Read Model, and Event History APIs for Chronos Engine")
