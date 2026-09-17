@@ -13,6 +13,10 @@ import com.chronos.domain.account.exception.*;
 import com.chronos.domain.event.DomainEventEnvelope;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.chronos.application.port.SnapshotRepository;
+import com.chronos.domain.snapshot.Snapshot;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -23,11 +27,26 @@ public class AccountCommandProcessor {
 
     private final EventStore eventStore;
     private final ObjectMapper objectMapper;
+    private final SnapshotRepository snapshotRepository;
+    private final int snapshotInterval;
 
     public AccountCommandProcessor(EventStore eventStore, ObjectMapper objectMapper) {
+        this(eventStore, objectMapper, null, 100);
+    }
+
+    @Autowired
+    public AccountCommandProcessor(
+            EventStore eventStore,
+            ObjectMapper objectMapper,
+            @Autowired(required = false) SnapshotRepository snapshotRepository,
+            @Value("${chronos.snapshot.interval:100}") int snapshotInterval
+    ) {
         this.eventStore = Objects.requireNonNull(eventStore, "eventStore must not be null");
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
+        this.snapshotRepository = snapshotRepository;
+        this.snapshotInterval = snapshotInterval > 0 ? snapshotInterval : 100;
     }
+
 
     public CommandResult process(AccountCommand command, CommandContext context) {
         Objects.requireNonNull(command, "command must not be null");
@@ -304,8 +323,19 @@ public class AccountCommandProcessor {
             resultingState = AccountReducer.reduce(resultingState, event);
         }
 
+        // 6. Non-blocking automatic snapshot creation if threshold reached
+        if (snapshotRepository != null && resultingState.sequenceNumber() > 0 && resultingState.sequenceNumber() % snapshotInterval == 0) {
+            try {
+                Snapshot snapshot = Snapshot.create(resultingState);
+                snapshotRepository.save(snapshot);
+            } catch (Exception e) {
+                // Fail-safe: Event store is source of truth, snapshot save failure must not invalidate command execution
+            }
+        }
+
         return new CommandResult(accountId, resultingState, Collections.unmodifiableList(eventsToAppend), resultingState.sequenceNumber());
     }
+
 
     private void ensureInitialized(AccountState state) {
         if (state.status() == AccountStatus.UNINITIALIZED) {

@@ -148,6 +148,40 @@ public class PostgresEventStore implements EventStore {
         return jdbcTemplate.query(sql, new EventEnvelopeRowMapper(objectMapper), aggregateId, Timestamp.from(timestamp));
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<DomainEventEnvelope> loadStreamFrom(UUID aggregateId, long fromSequenceNumber) {
+        Objects.requireNonNull(aggregateId, "aggregateId must not be null");
+
+        String sql = """
+            SELECT event_id, aggregate_id, aggregate_type, sequence_number,
+                   event_type, event_version, recorded_at, metadata, payload
+            FROM event_store
+            WHERE aggregate_id = ? AND sequence_number > ?
+            ORDER BY sequence_number ASC
+            """;
+
+        return jdbcTemplate.query(sql, new EventEnvelopeRowMapper(objectMapper), aggregateId, fromSequenceNumber);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DomainEventEnvelope> loadStreamFromAndUpTo(UUID aggregateId, long fromSequenceNumber, Instant timestamp) {
+        Objects.requireNonNull(aggregateId, "aggregateId must not be null");
+        Objects.requireNonNull(timestamp, "timestamp must not be null");
+
+        String sql = """
+            SELECT event_id, aggregate_id, aggregate_type, sequence_number,
+                   event_type, event_version, recorded_at, metadata, payload
+            FROM event_store
+            WHERE aggregate_id = ? AND sequence_number > ? AND recorded_at <= ?
+            ORDER BY sequence_number ASC
+            """;
+
+        return jdbcTemplate.query(sql, new EventEnvelopeRowMapper(objectMapper), aggregateId, fromSequenceNumber, Timestamp.from(timestamp));
+    }
+
+
     private String toJsonString(Object obj) {
         try {
             return objectMapper.writeValueAsString(obj);

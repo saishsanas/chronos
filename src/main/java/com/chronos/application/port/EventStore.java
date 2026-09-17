@@ -13,5 +13,10 @@ public interface EventStore {
 
     List<DomainEventEnvelope> loadStreamUpTo(UUID aggregateId, Instant timestamp);
 
+    List<DomainEventEnvelope> loadStreamFrom(UUID aggregateId, long fromSequenceNumber);
+
+    List<DomainEventEnvelope> loadStreamFromAndUpTo(UUID aggregateId, long fromSequenceNumber, Instant timestamp);
+
     long currentVersion(UUID aggregateId);
 }
+
