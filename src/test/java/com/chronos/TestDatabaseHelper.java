@@ -12,6 +12,9 @@ public class TestDatabaseHelper {
         String containerUrl = "jdbc:postgresql://localhost:5432/chronos_db";
         String testDbUrl = "jdbc:postgresql://localhost:5432/chronos_test_db";
 
+        // Disable automatic Kafka listener startup during repository/unit tests by default
+        registry.add("spring.kafka.listener.auto-startup", () -> "false");
+
         // Check if Postgres container is running on 5432 with chronos_user
         try (Connection conn = DriverManager.getConnection(containerUrl, "chronos_user", "chronos_password")) {
             // Container Postgres is running! Create chronos_test_db if it doesn't exist

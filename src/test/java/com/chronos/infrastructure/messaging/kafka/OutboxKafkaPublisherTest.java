@@ -45,6 +45,7 @@ class OutboxKafkaPublisherTest {
         registry.add("chronos.kafka.topic", () -> "chronos.events.v1");
         registry.add("spring.kafka.bootstrap-servers", () -> System.getProperty("spring.embedded.kafka.brokers"));
         registry.add("spring.kafka.producer.acks", () -> "all");
+        registry.add("spring.kafka.listener.auto-startup", () -> "true");
     }
 
     @Autowired

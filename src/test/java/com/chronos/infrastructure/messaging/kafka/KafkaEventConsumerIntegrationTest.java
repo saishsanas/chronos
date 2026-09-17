@@ -35,6 +35,8 @@ public class KafkaEventConsumerIntegrationTest {
         com.chronos.TestDatabaseHelper.configureProperties(registry);
         registry.add("chronos.kafka.topic", () -> "chronos.events.inbox.v1");
         registry.add("chronos.kafka.consumer.group-id", () -> "chronos-engine-test-group-" + UUID.randomUUID());
+        registry.add("spring.kafka.bootstrap-servers", () -> System.getProperty("spring.embedded.kafka.brokers"));
+        registry.add("spring.kafka.listener.auto-startup", () -> "true");
     }
 
     @Autowired
