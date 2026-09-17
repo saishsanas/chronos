@@ -84,6 +84,16 @@ public class PostgresEventStore implements EventStore {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb)
             """;
 
+        String outboxSql = """
+            INSERT INTO outbox_events (
+                outbox_id, event_id, aggregate_id, aggregate_type, sequence_number,
+                event_type, event_version, recorded_at, event_envelope, status,
+                attempts, next_attempt_at, locked_until, locked_by, published_at, last_error, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?, ?)
+            """;
+
+        Instant now = Instant.now();
+
         try {
             jdbcTemplate.batchUpdate(
                 sql,
@@ -101,6 +111,31 @@ public class PostgresEventStore implements EventStore {
                     ps.setString(9, toJsonString(event.payload()));
                 }
             );
+
+            jdbcTemplate.batchUpdate(
+                outboxSql,
+                events,
+                events.size(),
+                (ps, event) -> {
+                    ps.setObject(1, UUID.randomUUID());
+                    ps.setObject(2, event.eventId());
+                    ps.setObject(3, event.aggregateId());
+                    ps.setString(4, event.aggregateType());
+                    ps.setLong(5, event.sequenceNumber());
+                    ps.setString(6, event.eventType());
+                    ps.setInt(7, event.eventVersion());
+                    ps.setTimestamp(8, Timestamp.from(event.recordedAt()));
+                    ps.setString(9, toJsonString(event));
+                    ps.setString(10, "PENDING");
+                    ps.setInt(11, 0);
+                    ps.setTimestamp(12, Timestamp.from(now));
+                    ps.setNull(13, java.sql.Types.TIMESTAMP);
+                    ps.setNull(14, java.sql.Types.VARCHAR);
+                    ps.setNull(15, java.sql.Types.TIMESTAMP);
+                    ps.setNull(16, java.sql.Types.VARCHAR);
+                    ps.setTimestamp(17, Timestamp.from(now));
+                }
+            );
         } catch (DuplicateKeyException e) {
             throw new OptimisticConcurrencyException(
                 "Concurrency conflict appending to aggregate " + aggregateId + ": sequence constraint violated", e
@@ -115,6 +150,7 @@ public class PostgresEventStore implements EventStore {
             throw e;
         }
     }
+
 
     @Override
     @Transactional(readOnly = true)
