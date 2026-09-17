@@ -2,9 +2,9 @@ spring:
   application:
     name: chronos-engine
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/chronos_db}
-    username: ${SPRING_DATASOURCE_USERNAME:chronos_user}
-    password: ${SPRING_DATASOURCE_PASSWORD:chronos_password}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/chronos_test_db}
+    username: ${SPRING_DATASOURCE_USERNAME:test_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:test_password}
     driver-class-name: org.postgresql.Driver
   flyway:
     enabled: true
