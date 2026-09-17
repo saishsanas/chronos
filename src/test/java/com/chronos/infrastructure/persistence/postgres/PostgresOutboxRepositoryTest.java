@@ -55,7 +55,7 @@ class PostgresOutboxRepositoryTest {
     void testAtomicEventAndOutboxWrite() {
         UUID aggregateId = UUID.randomUUID();
         UUID eventId = UUID.randomUUID();
-        Instant now = Instant.parse("2026-09-17T18:00:00Z");
+        Instant now = Instant.now();
 
         EventMetadata meta = new EventMetadata(UUID.randomUUID(), UUID.randomUUID(), "actor-1", "idemp-1");
         ObjectNode payload = objectMapper.createObjectNode().put("currency", "INR").put("initialOverdraftLimitMinor", 1000L).put("initialTransactionLimitMinor", 5000L);
@@ -87,7 +87,7 @@ class PostgresOutboxRepositoryTest {
     @DisplayName("6-10. Outbox claim, skip locked concurrency, lease expiration recovery & mark for retry")
     void testOutboxClaimAndLeaseRecovery() {
         UUID aggregateId = UUID.randomUUID();
-        Instant now = Instant.parse("2026-09-17T18:00:00Z");
+        Instant now = Instant.now();
 
         EventMetadata meta = new EventMetadata(UUID.randomUUID(), UUID.randomUUID(), "actor-1", "idemp-1");
         DomainEventEnvelope e1 = new DomainEventEnvelope(
