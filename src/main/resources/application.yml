@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: chronos-engine
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/chronos_db}
+    username: ${SPRING_DATASOURCE_USERNAME:chronos_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:chronos_password}
+    driver-class-name: org.postgresql.Driver
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+server:
+  port: 8080
+
+logging:
+  level:
+    root: INFO
+    com.chronos: INFO
