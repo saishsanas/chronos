@@ -1,0 +1,32 @@
+name: Chronos Engine CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  build-and-test:
+    name: Maven Build & Unit/Integration Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21 Temurin
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Execute Maven Build and Tests
+        run: mvn -B clean test
+
+      - name: Verify Docker Build
+        run: docker build -t chronos-engine:ci .
+
+      - name: Verify Docker Compose Configuration
+        run: docker compose config

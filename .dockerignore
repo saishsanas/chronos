@@ -1,0 +1,10 @@
+.git
+.github
+.idea
+*.iml
+target/
+logs/
+*.log
+.env
+README.md
+.gitignore

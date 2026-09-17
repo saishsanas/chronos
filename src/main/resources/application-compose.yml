@@ -1,0 +1,13 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/chronos_db
+    username: chronos_user
+    password: chronos_password
+  kafka:
+    bootstrap-servers: kafka:9092
+
+chronos:
+  kafka:
+    topic: chronos.events.v1
+    consumer:
+      group-id: chronos-engine-compose-v1

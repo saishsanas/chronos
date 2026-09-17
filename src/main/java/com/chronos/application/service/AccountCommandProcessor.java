@@ -15,6 +15,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.chronos.application.port.SnapshotRepository;
 import com.chronos.domain.snapshot.Snapshot;
+import com.chronos.infrastructure.observability.ChronosMetrics;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -29,9 +30,14 @@ public class AccountCommandProcessor {
     private final ObjectMapper objectMapper;
     private final SnapshotRepository snapshotRepository;
     private final int snapshotInterval;
+    private final ChronosMetrics metrics;
 
     public AccountCommandProcessor(EventStore eventStore, ObjectMapper objectMapper) {
-        this(eventStore, objectMapper, null, 100);
+        this(eventStore, objectMapper, null, 100, null);
+    }
+
+    public AccountCommandProcessor(EventStore eventStore, ObjectMapper objectMapper, SnapshotRepository snapshotRepository, int snapshotInterval) {
+        this(eventStore, objectMapper, snapshotRepository, snapshotInterval, null);
     }
 
     @Autowired
@@ -39,18 +45,36 @@ public class AccountCommandProcessor {
             EventStore eventStore,
             ObjectMapper objectMapper,
             @Autowired(required = false) SnapshotRepository snapshotRepository,
-            @Value("${chronos.snapshot.interval:100}") int snapshotInterval
+            @Value("${chronos.snapshot.interval:100}") int snapshotInterval,
+            @Autowired(required = false) ChronosMetrics metrics
     ) {
         this.eventStore = Objects.requireNonNull(eventStore, "eventStore must not be null");
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
         this.snapshotRepository = snapshotRepository;
         this.snapshotInterval = snapshotInterval > 0 ? snapshotInterval : 100;
+        this.metrics = metrics;
     }
 
 
     public CommandResult process(AccountCommand command, CommandContext context) {
         Objects.requireNonNull(command, "command must not be null");
         Objects.requireNonNull(context, "context must not be null");
+
+        try {
+            CommandResult result = doProcess(command, context);
+            if (metrics != null) {
+                metrics.recordCommandProcessed(command.getClass().getSimpleName());
+            }
+            return result;
+        } catch (Exception e) {
+            if (metrics != null) {
+                metrics.recordCommandFailed(command.getClass().getSimpleName(), e.getClass().getSimpleName());
+            }
+            throw e;
+        }
+    }
+
+    private CommandResult doProcess(AccountCommand command, CommandContext context) {
 
         UUID accountId = command.accountId();
         Instant commandTimestamp = Instant.now();
