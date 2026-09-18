@@ -6,6 +6,7 @@ import com.chronos.application.port.ProjectionRebuildJobRepository;
 import com.chronos.domain.account.AccountReducer;
 import com.chronos.domain.account.AccountState;
 import com.chronos.domain.event.DomainEventEnvelope;
+import com.chronos.domain.event.upcasting.EventUpcasterRegistry;
 import com.chronos.domain.projection.AccountSummaryProjection;
 import com.chronos.domain.projection.ProjectionRebuildJob;
 import com.chronos.infrastructure.cache.RedisCacheService;
@@ -31,6 +32,17 @@ public class ProjectionRebuildService {
     private final RedisCacheService redisCacheService;
     private final JdbcTemplate jdbcTemplate;
     private final ChronosMetrics metrics;
+    private final EventUpcasterRegistry upcasterRegistry;
+
+    public ProjectionRebuildService(
+        EventStore eventStore,
+        AccountSummaryProjectionRepository projectionRepository,
+        ProjectionRebuildJobRepository rebuildJobRepository,
+        RedisCacheService redisCacheService,
+        JdbcTemplate jdbcTemplate
+    ) {
+        this(eventStore, projectionRepository, rebuildJobRepository, redisCacheService, jdbcTemplate, null, EventUpcasterRegistry.getInstance());
+    }
 
     public ProjectionRebuildService(
         EventStore eventStore,
@@ -40,12 +52,26 @@ public class ProjectionRebuildService {
         JdbcTemplate jdbcTemplate,
         @Autowired(required = false) ChronosMetrics metrics
     ) {
+        this(eventStore, projectionRepository, rebuildJobRepository, redisCacheService, jdbcTemplate, metrics, EventUpcasterRegistry.getInstance());
+    }
+
+    @Autowired
+    public ProjectionRebuildService(
+        EventStore eventStore,
+        AccountSummaryProjectionRepository projectionRepository,
+        ProjectionRebuildJobRepository rebuildJobRepository,
+        RedisCacheService redisCacheService,
+        JdbcTemplate jdbcTemplate,
+        @Autowired(required = false) ChronosMetrics metrics,
+        @Autowired(required = false) EventUpcasterRegistry upcasterRegistry
+    ) {
         this.eventStore = Objects.requireNonNull(eventStore, "eventStore must not be null");
         this.projectionRepository = Objects.requireNonNull(projectionRepository, "projectionRepository must not be null");
         this.rebuildJobRepository = Objects.requireNonNull(rebuildJobRepository, "rebuildJobRepository must not be null");
         this.redisCacheService = Objects.requireNonNull(redisCacheService, "redisCacheService must not be null");
         this.jdbcTemplate = Objects.requireNonNull(jdbcTemplate, "jdbcTemplate must not be null");
         this.metrics = metrics;
+        this.upcasterRegistry = upcasterRegistry != null ? upcasterRegistry : EventUpcasterRegistry.getInstance();
     }
 
     public ProjectionRebuildJob rebuildFull() {
@@ -76,7 +102,8 @@ public class ProjectionRebuildService {
 
                 AccountState state = AccountState.uninitialized(accountId);
                 for (DomainEventEnvelope envelope : stream) {
-                    state = AccountReducer.reduce(state, envelope);
+                    DomainEventEnvelope canonical = upcasterRegistry.upcastToCanonical(envelope);
+                    state = AccountReducer.reduce(state, canonical);
                 }
 
                 if (state.sequenceNumber() > 0) {
@@ -130,7 +157,8 @@ public class ProjectionRebuildService {
             List<DomainEventEnvelope> stream = eventStore.loadStream(accountId);
             AccountState state = AccountState.uninitialized(accountId);
             for (DomainEventEnvelope envelope : stream) {
-                state = AccountReducer.reduce(state, envelope);
+                DomainEventEnvelope canonical = upcasterRegistry.upcastToCanonical(envelope);
+                state = AccountReducer.reduce(state, canonical);
             }
 
             if (state.sequenceNumber() > 0) {
@@ -153,12 +181,12 @@ public class ProjectionRebuildService {
             return rebuildJobRepository.findById(job.jobId()).orElse(job);
 
         } catch (Exception e) {
-            log.error("Targeted projection rebuild for aggregate {} FAILED: {}", accountId, e.getMessage(), e);
+            log.error("Targeted projection rebuild FAILED for aggregate {}: {}", accountId, e.getMessage(), e);
             rebuildJobRepository.markFailed(job.jobId(), e.getMessage());
             if (metrics != null) {
                 metrics.recordProjectionRebuildFailure();
             }
-            throw new RuntimeException("Targeted projection rebuild failed for aggregate " + accountId + ": " + e.getMessage(), e);
+            throw new RuntimeException("Targeted projection rebuild failed: " + e.getMessage(), e);
         }
     }
 }

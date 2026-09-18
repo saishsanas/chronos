@@ -38,10 +38,12 @@ class AccountReducerTest {
         assertThat(s1.overdraftLimitMinor()).isEqualTo(50000L);
         assertThat(s1.transactionLimitMinor()).isEqualTo(100000L);
 
-        // 2. MoneyDeposited
-        ObjectNode depositPayload = objectMapper.createObjectNode().put("amountMinor", 200000L);
+        // 2. MoneyDeposited (canonical v2)
+        ObjectNode depositPayload = objectMapper.createObjectNode()
+                .put("amountMinor", 200000L)
+                .put("source", "MANUAL");
         DomainEventEnvelope e2 = new DomainEventEnvelope(
-                UUID.randomUUID(), accountId, "Account", 2L, "MoneyDeposited", 1, baseTime.plusSeconds(1), metadata, depositPayload
+                UUID.randomUUID(), accountId, "Account", 2L, "MoneyDeposited", 2, baseTime.plusSeconds(1), metadata, depositPayload
         );
         AccountState s2 = AccountReducer.reduce(s1, e2);
         assertThat(s2.balanceMinor()).isEqualTo(200000L);

@@ -6,7 +6,9 @@ import com.chronos.application.port.SnapshotRepository;
 import com.chronos.domain.account.AccountReducer;
 import com.chronos.domain.account.AccountState;
 import com.chronos.domain.event.DomainEventEnvelope;
+import com.chronos.domain.event.upcasting.EventUpcasterRegistry;
 import com.chronos.domain.snapshot.Snapshot;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -20,10 +22,21 @@ public class TemporalStateReconstructor {
 
     private final EventStore eventStore;
     private final SnapshotRepository snapshotRepository;
+    private final EventUpcasterRegistry upcasterRegistry;
 
     public TemporalStateReconstructor(EventStore eventStore, SnapshotRepository snapshotRepository) {
+        this(eventStore, snapshotRepository, EventUpcasterRegistry.getInstance());
+    }
+
+    @Autowired
+    public TemporalStateReconstructor(
+        EventStore eventStore,
+        SnapshotRepository snapshotRepository,
+        @Autowired(required = false) EventUpcasterRegistry upcasterRegistry
+    ) {
         this.eventStore = Objects.requireNonNull(eventStore, "eventStore must not be null");
         this.snapshotRepository = Objects.requireNonNull(snapshotRepository, "snapshotRepository must not be null");
+        this.upcasterRegistry = upcasterRegistry != null ? upcasterRegistry : EventUpcasterRegistry.getInstance();
     }
 
     public TemporalResult reconstructCurrentState(UUID aggregateId) {
@@ -38,7 +51,8 @@ public class TemporalStateReconstructor {
 
             AccountState state = snapshot.state();
             for (DomainEventEnvelope event : events) {
-                state = AccountReducer.reduce(state, event);
+                DomainEventEnvelope canonical = upcasterRegistry.upcastToCanonical(event);
+                state = AccountReducer.reduce(state, canonical);
             }
 
             return new TemporalResult(aggregateId, state, null, state.sequenceNumber(), true, snapshotSeq, events.size());
@@ -63,7 +77,8 @@ public class TemporalStateReconstructor {
 
                 AccountState state = snapshot.state();
                 for (DomainEventEnvelope event : events) {
-                    state = AccountReducer.reduce(state, event);
+                    DomainEventEnvelope canonical = upcasterRegistry.upcastToCanonical(event);
+                    state = AccountReducer.reduce(state, canonical);
                 }
 
                 return new TemporalResult(aggregateId, state, targetTimestamp, state.sequenceNumber(), true, snapshotSeq, events.size());
@@ -80,7 +95,8 @@ public class TemporalStateReconstructor {
         List<DomainEventEnvelope> events = eventStore.loadStream(aggregateId);
         AccountState state = AccountState.uninitialized(aggregateId);
         for (DomainEventEnvelope event : events) {
-            state = AccountReducer.reduce(state, event);
+            DomainEventEnvelope canonical = upcasterRegistry.upcastToCanonical(event);
+            state = AccountReducer.reduce(state, canonical);
         }
 
         return new TemporalResult(aggregateId, state, null, state.sequenceNumber(), false, 0L, events.size());
@@ -93,7 +109,8 @@ public class TemporalStateReconstructor {
         List<DomainEventEnvelope> events = eventStore.loadStreamUpTo(aggregateId, targetTimestamp);
         AccountState state = AccountState.uninitialized(aggregateId);
         for (DomainEventEnvelope event : events) {
-            state = AccountReducer.reduce(state, event);
+            DomainEventEnvelope canonical = upcasterRegistry.upcastToCanonical(event);
+            state = AccountReducer.reduce(state, canonical);
         }
 
         return new TemporalResult(aggregateId, state, targetTimestamp, state.sequenceNumber(), false, 0L, events.size());

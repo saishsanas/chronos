@@ -122,6 +122,29 @@ public class ChronosMetrics {
         meterRegistry.counter("chronos.cache.failure").increment();
     }
 
+    public void recordEventUpcast(String eventType, int fromVersion, int toVersion) {
+        meterRegistry.counter("chronos.event.upcast",
+            "eventType", sanitize(eventType),
+            "fromVersion", String.valueOf(fromVersion),
+            "toVersion", String.valueOf(toVersion)
+        ).increment();
+    }
+
+    public void recordEventUpcastFailure(String eventType) {
+        meterRegistry.counter("chronos.event.upcast.failure", "eventType", sanitize(eventType)).increment();
+    }
+
+    public void recordUnsupportedEventVersion(String eventType, int version) {
+        meterRegistry.counter("chronos.event.unsupported_version",
+            "eventType", sanitize(eventType),
+            "version", String.valueOf(version)
+        ).increment();
+    }
+
+    public void recordUnknownEventType(String eventType) {
+        meterRegistry.counter("chronos.event.unknown_type", "eventType", sanitize(eventType)).increment();
+    }
+
     private String sanitize(String input) {
         if (input == null || input.isBlank()) return "UNKNOWN";
         return input.replaceAll("[^a-zA-Z0-9_.-]", "_");

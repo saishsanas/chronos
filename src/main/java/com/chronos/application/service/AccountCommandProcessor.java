@@ -23,6 +23,8 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.*;
 
+import com.chronos.domain.event.upcasting.EventUpcasterRegistry;
+
 @Service
 public class AccountCommandProcessor {
 
@@ -31,13 +33,24 @@ public class AccountCommandProcessor {
     private final SnapshotRepository snapshotRepository;
     private final int snapshotInterval;
     private final ChronosMetrics metrics;
+    private final EventUpcasterRegistry upcasterRegistry;
 
     public AccountCommandProcessor(EventStore eventStore, ObjectMapper objectMapper) {
-        this(eventStore, objectMapper, null, 100, null);
+        this(eventStore, objectMapper, null, 100, null, EventUpcasterRegistry.getInstance());
     }
 
     public AccountCommandProcessor(EventStore eventStore, ObjectMapper objectMapper, SnapshotRepository snapshotRepository, int snapshotInterval) {
-        this(eventStore, objectMapper, snapshotRepository, snapshotInterval, null);
+        this(eventStore, objectMapper, snapshotRepository, snapshotInterval, null, EventUpcasterRegistry.getInstance());
+    }
+
+    public AccountCommandProcessor(
+            EventStore eventStore,
+            ObjectMapper objectMapper,
+            SnapshotRepository snapshotRepository,
+            int snapshotInterval,
+            ChronosMetrics metrics
+    ) {
+        this(eventStore, objectMapper, snapshotRepository, snapshotInterval, metrics, EventUpcasterRegistry.getInstance());
     }
 
     @Autowired
@@ -46,13 +59,15 @@ public class AccountCommandProcessor {
             ObjectMapper objectMapper,
             @Autowired(required = false) SnapshotRepository snapshotRepository,
             @Value("${chronos.snapshot.interval:100}") int snapshotInterval,
-            @Autowired(required = false) ChronosMetrics metrics
+            @Autowired(required = false) ChronosMetrics metrics,
+            @Autowired(required = false) EventUpcasterRegistry upcasterRegistry
     ) {
         this.eventStore = Objects.requireNonNull(eventStore, "eventStore must not be null");
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
         this.snapshotRepository = snapshotRepository;
         this.snapshotInterval = snapshotInterval > 0 ? snapshotInterval : 100;
         this.metrics = metrics;
+        this.upcasterRegistry = upcasterRegistry != null ? upcasterRegistry : EventUpcasterRegistry.getInstance();
     }
 
 
@@ -85,7 +100,8 @@ public class AccountCommandProcessor {
         // 2. Reconstruct current state & validate stream integrity via AccountReducer
         AccountState currentState = AccountState.uninitialized(accountId);
         for (DomainEventEnvelope event : stream) {
-            currentState = AccountReducer.reduce(currentState, event);
+            DomainEventEnvelope canonical = upcasterRegistry.upcastToCanonical(event);
+            currentState = AccountReducer.reduce(currentState, canonical);
         }
 
         long expectedVersion = currentState.sequenceNumber();
@@ -129,13 +145,15 @@ public class AccountCommandProcessor {
                 }
                 try {
                     long newBalance = Math.addExact(currentState.balanceMinor(), cmd.amountMinor());
+                    String source = (cmd.source() != null && !cmd.source().isBlank()) ? cmd.source().trim() : "MANUAL";
                     ObjectNode payload = objectMapper.createObjectNode()
                             .put("amountMinor", cmd.amountMinor())
                             .put("currency", currentState.currency())
-                            .put("resultingBalanceMinor", newBalance);
+                            .put("resultingBalanceMinor", newBalance)
+                            .put("source", source);
 
                     eventsToAppend.add(createEnvelope(
-                            UUID.randomUUID(), accountId, nextSequence, "MoneyDeposited", 1, commandTimestamp, context, payload
+                            UUID.randomUUID(), accountId, nextSequence, "MoneyDeposited", 2, commandTimestamp, context, payload
                     ));
                 } catch (ArithmeticException e) {
                     throw new DomainValidationException("Deposit amount causes monetary balance overflow", e);

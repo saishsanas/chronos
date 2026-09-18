@@ -81,7 +81,8 @@ public class AccountController {
         @RequestHeader(value = "X-Causation-Id", required = false) String causationId
     ) {
         CommandContext context = createContext(idempotencyKey, correlationId, causationId);
-        DepositMoney command = new DepositMoney(accountId, request.amountMinor());
+        String source = (request.source() != null && !request.source().isBlank()) ? request.source().trim() : "MANUAL";
+        DepositMoney command = new DepositMoney(accountId, request.amountMinor(), source);
         CommandExecutionResponse response = idempotencyService.executeIdempotent(
             context.actorId(), idempotencyKey, request, "DepositMoney", accountId,
             () -> CommandExecutionResponse.fromDomain(commandProcessor.process(command, context), context.correlationId())

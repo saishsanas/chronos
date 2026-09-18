@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
+import com.chronos.domain.event.upcasting.EventSchemaRegistry;
 import java.util.Set;
 
 @Service
@@ -24,21 +25,10 @@ public class InboxEventProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(InboxEventProcessor.class);
 
-    private static final Set<String> SUPPORTED_EVENT_TYPES = Set.of(
-        "AccountCreated",
-        "MoneyDeposited",
-        "MoneyWithdrawn",
-        "AccountFrozen",
-        "AccountUnfrozen",
-        "OverdraftLimitChanged",
-        "TransactionLimitChanged",
-        "CorrectionIssued",
-        "AccountClosed"
-    );
-
     private final InboxRepository inboxRepository;
     private final DownstreamEventConsumer downstreamEventConsumer;
     private final ChronosMetrics metrics;
+    private final EventSchemaRegistry schemaRegistry;
 
     public enum ProcessResult {
         PROCESSED,
@@ -50,18 +40,28 @@ public class InboxEventProcessor {
         InboxRepository inboxRepository,
         @Autowired(required = false) DownstreamEventConsumer downstreamEventConsumer
     ) {
-        this(inboxRepository, downstreamEventConsumer, null);
+        this(inboxRepository, downstreamEventConsumer, null, EventSchemaRegistry.getInstance());
+    }
+
+    public InboxEventProcessor(
+        InboxRepository inboxRepository,
+        @Autowired(required = false) DownstreamEventConsumer downstreamEventConsumer,
+        @Autowired(required = false) ChronosMetrics metrics
+    ) {
+        this(inboxRepository, downstreamEventConsumer, metrics, EventSchemaRegistry.getInstance());
     }
 
     @Autowired
     public InboxEventProcessor(
         InboxRepository inboxRepository,
         @Autowired(required = false) DownstreamEventConsumer downstreamEventConsumer,
-        @Autowired(required = false) ChronosMetrics metrics
+        @Autowired(required = false) ChronosMetrics metrics,
+        @Autowired(required = false) EventSchemaRegistry schemaRegistry
     ) {
         this.inboxRepository = Objects.requireNonNull(inboxRepository, "inboxRepository must not be null");
         this.downstreamEventConsumer = downstreamEventConsumer;
         this.metrics = metrics;
+        this.schemaRegistry = schemaRegistry != null ? schemaRegistry : EventSchemaRegistry.getInstance();
     }
 
     @Transactional(noRollbackFor = InvalidEventEnvelopeException.class)
@@ -166,10 +166,10 @@ public class InboxEventProcessor {
         if (envelope.sequenceNumber() <= 0) {
             throw new InvalidEventEnvelopeException("sequenceNumber must be greater than 0: " + envelope.sequenceNumber());
         }
-        if (envelope.eventType() == null || !SUPPORTED_EVENT_TYPES.contains(envelope.eventType())) {
+        if (envelope.eventType() == null || !schemaRegistry.isKnownEventType(envelope.eventType())) {
             throw new InvalidEventEnvelopeException("Unsupported or unknown eventType: " + envelope.eventType());
         }
-        if (envelope.eventVersion() != 1) {
+        if (!schemaRegistry.isSupportedVersion(envelope.eventType(), envelope.eventVersion())) {
             throw new InvalidEventEnvelopeException("Unsupported eventVersion: " + envelope.eventVersion());
         }
         if (envelope.metadata() == null) {

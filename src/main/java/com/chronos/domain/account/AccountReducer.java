@@ -51,10 +51,15 @@ public final class AccountReducer {
             }
         }
 
-        // 4. Validate Event Schema Version
-        if (event.eventVersion() != 1) {
-            throw new CorruptedEventStreamException(
-                "Unsupported event version: " + event.eventVersion() + " for event type '" + event.eventType() + "'"
+        // 4. Validate Event Schema Version: reducer expects the canonical current version
+        if (!com.chronos.domain.event.upcasting.EventSchemaRegistry.getInstance().isKnownEventType(event.eventType())) {
+            throw new CorruptedEventStreamException("Unknown event type: '" + event.eventType() + "'");
+        }
+        int canonicalVersion = com.chronos.domain.event.upcasting.EventSchemaRegistry.getInstance().getCurrentVersion(event.eventType());
+        if (event.eventVersion() != canonicalVersion) {
+            throw new com.chronos.domain.event.upcasting.exception.UnsupportedEventVersionException(
+                event.eventType(), event.eventVersion(),
+                "Unsupported event version: " + event.eventVersion() + " (expected canonical v" + canonicalVersion + " for event type '" + event.eventType() + "')"
             );
         }
 
@@ -97,6 +102,13 @@ public final class AccountReducer {
                         throw new CorruptedEventStreamException("Cannot apply MoneyDeposited to an account in status " + current.status());
                     }
                     long amount = event.getPayloadLong("amountMinor");
+                    if (amount <= 0) {
+                        throw new CorruptedEventStreamException("Deposit amount must be positive");
+                    }
+                    String source = event.getPayloadString("source");
+                    if (source == null || source.isBlank()) {
+                        throw new CorruptedEventStreamException("MoneyDeposited v2 missing source");
+                    }
                     long newBalance = Math.addExact(current.balanceMinor(), amount);
                     yield new AccountState(
                         current.accountId(),

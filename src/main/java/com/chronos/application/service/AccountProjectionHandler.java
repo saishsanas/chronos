@@ -6,6 +6,7 @@ import com.chronos.application.port.DownstreamEventConsumer;
 import com.chronos.domain.account.AccountReducer;
 import com.chronos.domain.account.AccountState;
 import com.chronos.domain.event.DomainEventEnvelope;
+import com.chronos.domain.event.upcasting.EventUpcasterRegistry;
 import com.chronos.domain.projection.AccountSummaryProjection;
 import com.chronos.infrastructure.cache.RedisCacheService;
 import com.chronos.infrastructure.observability.ChronosMetrics;
@@ -27,15 +28,34 @@ public class AccountProjectionHandler implements DownstreamEventConsumer {
     private final AccountSummaryProjectionRepository projectionRepository;
     private final RedisCacheService redisCacheService;
     private final ChronosMetrics metrics;
+    private final EventUpcasterRegistry upcasterRegistry;
+
+    public AccountProjectionHandler(
+        AccountSummaryProjectionRepository projectionRepository,
+        RedisCacheService redisCacheService
+    ) {
+        this(projectionRepository, redisCacheService, null, EventUpcasterRegistry.getInstance());
+    }
 
     public AccountProjectionHandler(
         AccountSummaryProjectionRepository projectionRepository,
         RedisCacheService redisCacheService,
         @Autowired(required = false) ChronosMetrics metrics
     ) {
+        this(projectionRepository, redisCacheService, metrics, EventUpcasterRegistry.getInstance());
+    }
+
+    @Autowired
+    public AccountProjectionHandler(
+        AccountSummaryProjectionRepository projectionRepository,
+        RedisCacheService redisCacheService,
+        @Autowired(required = false) ChronosMetrics metrics,
+        @Autowired(required = false) EventUpcasterRegistry upcasterRegistry
+    ) {
         this.projectionRepository = Objects.requireNonNull(projectionRepository, "projectionRepository must not be null");
         this.redisCacheService = Objects.requireNonNull(redisCacheService, "redisCacheService must not be null");
         this.metrics = metrics;
+        this.upcasterRegistry = upcasterRegistry != null ? upcasterRegistry : EventUpcasterRegistry.getInstance();
     }
 
     @Override
@@ -48,8 +68,9 @@ public class AccountProjectionHandler implements DownstreamEventConsumer {
             AccountState currentState = existing.map(AccountSummaryProjection::toAccountState)
                 .orElseGet(() -> AccountState.uninitialized(envelope.aggregateId()));
 
-            // Reuse canonical AccountReducer for deterministic state projection
-            AccountState resultingState = AccountReducer.reduce(currentState, envelope);
+            // Upcast incoming envelope to current canonical representation before applying AccountReducer
+            DomainEventEnvelope canonical = upcasterRegistry.upcastToCanonical(envelope);
+            AccountState resultingState = AccountReducer.reduce(currentState, canonical);
 
             AccountSummaryProjection updatedProjection = AccountSummaryProjection.fromAccountState(resultingState, Instant.now());
             projectionRepository.save(updatedProjection);
