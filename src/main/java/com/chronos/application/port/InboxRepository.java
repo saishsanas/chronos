@@ -15,6 +15,8 @@ public interface InboxRepository {
 
     void markFailed(UUID inboxId, String lastError);
 
+    void markQuarantined(UUID inboxId, String lastError);
+
     long getLastProcessedSequence(UUID aggregateId);
 
     void updateConsumerSequence(UUID aggregateId, long sequenceNumber, Instant updatedAt);

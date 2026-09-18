@@ -72,13 +72,17 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
     }
 
-    // 409 Conflict (Optimistic Concurrency Control)
-    @ExceptionHandler(OptimisticConcurrencyException.class)
-    public ResponseEntity<ApiErrorResponse> handleConflict(OptimisticConcurrencyException ex, HttpServletRequest request) {
-        log.warn("Concurrency Conflict [{}]: {}", request.getRequestURI(), ex.getMessage());
+    // 409 Conflict (Optimistic Concurrency Control & Idempotency Conflict)
+    @ExceptionHandler({
+        OptimisticConcurrencyException.class,
+        com.chronos.domain.idempotency.CommandIdempotencyConflictException.class
+    })
+    public ResponseEntity<ApiErrorResponse> handleConflict(Exception ex, HttpServletRequest request) {
+        log.warn("Conflict [{}]: {}", request.getRequestURI(), ex.getMessage());
+        String errorCode = ex instanceof OptimisticConcurrencyException ? "OPTIMISTIC_CONCURRENCY_CONFLICT" : "COMMAND_IDEMPOTENCY_CONFLICT";
         ApiErrorResponse body = ApiErrorResponse.of(
             HttpStatus.CONFLICT.value(),
-            "OPTIMISTIC_CONCURRENCY_CONFLICT",
+            errorCode,
             ex.getMessage(),
             request.getRequestURI(),
             getCorrelationId(request)

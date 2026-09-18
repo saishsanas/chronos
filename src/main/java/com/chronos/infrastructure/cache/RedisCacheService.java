@@ -97,4 +97,21 @@ public class RedisCacheService {
             if (metrics != null) metrics.recordCacheFailure();
         }
     }
+
+    public void clearAll() {
+        if (redisTemplate == null) {
+            return;
+        }
+
+        try {
+            java.util.Set<String> keys = redisTemplate.keys("chronos:account-summary:*");
+            if (keys != null && !keys.isEmpty()) {
+                redisTemplate.delete(keys);
+                log.info("Redis cache CLEAR_ALL removed {} keys", keys.size());
+            }
+        } catch (Exception e) {
+            log.warn("Redis cache clearAll failure: {}", e.getMessage());
+            if (metrics != null) metrics.recordCacheFailure();
+        }
+    }
 }

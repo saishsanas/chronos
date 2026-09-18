@@ -37,17 +37,20 @@ public class AccountController {
     private final TemporalStateReconstructor temporalReconstructor;
     private final EventStore eventStore;
     private final AccountSummaryQueryService summaryQueryService;
+    private final com.chronos.application.service.CommandIdempotencyService idempotencyService;
 
     public AccountController(
         AccountCommandProcessor commandProcessor,
         TemporalStateReconstructor temporalReconstructor,
         EventStore eventStore,
-        AccountSummaryQueryService summaryQueryService
+        AccountSummaryQueryService summaryQueryService,
+        com.chronos.application.service.CommandIdempotencyService idempotencyService
     ) {
         this.commandProcessor = Objects.requireNonNull(commandProcessor, "commandProcessor must not be null");
         this.temporalReconstructor = Objects.requireNonNull(temporalReconstructor, "temporalReconstructor must not be null");
         this.eventStore = Objects.requireNonNull(eventStore, "eventStore must not be null");
         this.summaryQueryService = Objects.requireNonNull(summaryQueryService, "summaryQueryService must not be null");
+        this.idempotencyService = Objects.requireNonNull(idempotencyService, "idempotencyService must not be null");
     }
 
     @PostMapping
@@ -61,8 +64,11 @@ public class AccountController {
         UUID accountId = UUID.randomUUID();
         CommandContext context = createContext(idempotencyKey, correlationId, causationId);
         CreateAccount command = new CreateAccount(accountId, request.currency(), request.initialOverdraftLimitMinor(), request.initialTransactionLimitMinor());
-        CommandResult result = commandProcessor.process(command, context);
-        return ResponseEntity.status(HttpStatus.CREATED).body(CommandExecutionResponse.fromDomain(result, context.correlationId()));
+        CommandExecutionResponse response = idempotencyService.executeIdempotent(
+            context.actorId(), idempotencyKey, request, "CreateAccount", accountId,
+            () -> CommandExecutionResponse.fromDomain(commandProcessor.process(command, context), context.correlationId())
+        );
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @PostMapping("/{accountId}/deposits")
@@ -76,8 +82,11 @@ public class AccountController {
     ) {
         CommandContext context = createContext(idempotencyKey, correlationId, causationId);
         DepositMoney command = new DepositMoney(accountId, request.amountMinor());
-        CommandResult result = commandProcessor.process(command, context);
-        return ResponseEntity.ok(CommandExecutionResponse.fromDomain(result, context.correlationId()));
+        CommandExecutionResponse response = idempotencyService.executeIdempotent(
+            context.actorId(), idempotencyKey, request, "DepositMoney", accountId,
+            () -> CommandExecutionResponse.fromDomain(commandProcessor.process(command, context), context.correlationId())
+        );
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/{accountId}/withdrawals")
@@ -91,8 +100,11 @@ public class AccountController {
     ) {
         CommandContext context = createContext(idempotencyKey, correlationId, causationId);
         WithdrawMoney command = new WithdrawMoney(accountId, request.amountMinor());
-        CommandResult result = commandProcessor.process(command, context);
-        return ResponseEntity.ok(CommandExecutionResponse.fromDomain(result, context.correlationId()));
+        CommandExecutionResponse response = idempotencyService.executeIdempotent(
+            context.actorId(), idempotencyKey, request, "WithdrawMoney", accountId,
+            () -> CommandExecutionResponse.fromDomain(commandProcessor.process(command, context), context.correlationId())
+        );
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/{accountId}/freeze")
@@ -106,8 +118,11 @@ public class AccountController {
     ) {
         CommandContext context = createContext(idempotencyKey, correlationId, causationId);
         FreezeAccount command = new FreezeAccount(accountId, request.reason());
-        CommandResult result = commandProcessor.process(command, context);
-        return ResponseEntity.ok(CommandExecutionResponse.fromDomain(result, context.correlationId()));
+        CommandExecutionResponse response = idempotencyService.executeIdempotent(
+            context.actorId(), idempotencyKey, request, "FreezeAccount", accountId,
+            () -> CommandExecutionResponse.fromDomain(commandProcessor.process(command, context), context.correlationId())
+        );
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/{accountId}/unfreeze")
@@ -121,8 +136,11 @@ public class AccountController {
     ) {
         CommandContext context = createContext(idempotencyKey, correlationId, causationId);
         UnfreezeAccount command = new UnfreezeAccount(accountId, request.reason());
-        CommandResult result = commandProcessor.process(command, context);
-        return ResponseEntity.ok(CommandExecutionResponse.fromDomain(result, context.correlationId()));
+        CommandExecutionResponse response = idempotencyService.executeIdempotent(
+            context.actorId(), idempotencyKey, request, "UnfreezeAccount", accountId,
+            () -> CommandExecutionResponse.fromDomain(commandProcessor.process(command, context), context.correlationId())
+        );
+        return ResponseEntity.ok(response);
     }
 
     @PutMapping("/{accountId}/limits/overdraft")
@@ -136,8 +154,11 @@ public class AccountController {
     ) {
         CommandContext context = createContext(idempotencyKey, correlationId, causationId);
         SetOverdraftLimit command = new SetOverdraftLimit(accountId, request.newOverdraftLimitMinor());
-        CommandResult result = commandProcessor.process(command, context);
-        return ResponseEntity.ok(CommandExecutionResponse.fromDomain(result, context.correlationId()));
+        CommandExecutionResponse response = idempotencyService.executeIdempotent(
+            context.actorId(), idempotencyKey, request, "SetOverdraftLimit", accountId,
+            () -> CommandExecutionResponse.fromDomain(commandProcessor.process(command, context), context.correlationId())
+        );
+        return ResponseEntity.ok(response);
     }
 
     @PutMapping("/{accountId}/limits/transaction")
@@ -151,8 +172,11 @@ public class AccountController {
     ) {
         CommandContext context = createContext(idempotencyKey, correlationId, causationId);
         SetTransactionLimit command = new SetTransactionLimit(accountId, request.newTransactionLimitMinor());
-        CommandResult result = commandProcessor.process(command, context);
-        return ResponseEntity.ok(CommandExecutionResponse.fromDomain(result, context.correlationId()));
+        CommandExecutionResponse response = idempotencyService.executeIdempotent(
+            context.actorId(), idempotencyKey, request, "SetTransactionLimit", accountId,
+            () -> CommandExecutionResponse.fromDomain(commandProcessor.process(command, context), context.correlationId())
+        );
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/{accountId}/corrections")
@@ -168,8 +192,11 @@ public class AccountController {
         IssueCorrection command = new IssueCorrection(
             accountId, request.targetEventId(), request.correctionType(), request.direction(), request.adjustmentAmountMinor(), request.reason()
         );
-        CommandResult result = commandProcessor.process(command, context);
-        return ResponseEntity.ok(CommandExecutionResponse.fromDomain(result, context.correlationId()));
+        CommandExecutionResponse response = idempotencyService.executeIdempotent(
+            context.actorId(), idempotencyKey, request, "IssueCorrection", accountId,
+            () -> CommandExecutionResponse.fromDomain(commandProcessor.process(command, context), context.correlationId())
+        );
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/{accountId}/close")
@@ -183,8 +210,11 @@ public class AccountController {
     ) {
         CommandContext context = createContext(idempotencyKey, correlationId, causationId);
         CloseAccount command = new CloseAccount(accountId, request.reason());
-        CommandResult result = commandProcessor.process(command, context);
-        return ResponseEntity.ok(CommandExecutionResponse.fromDomain(result, context.correlationId()));
+        CommandExecutionResponse response = idempotencyService.executeIdempotent(
+            context.actorId(), idempotencyKey, request, "CloseAccount", accountId,
+            () -> CommandExecutionResponse.fromDomain(commandProcessor.process(command, context), context.correlationId())
+        );
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{accountId}")

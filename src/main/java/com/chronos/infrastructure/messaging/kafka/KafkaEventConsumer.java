@@ -39,14 +39,19 @@ public class KafkaEventConsumer {
             InboxEventProcessor.ProcessResult result = inboxEventProcessor.process(envelope);
             log.info("Inbox processing result for eventId {}: {}", envelope.eventId(), result);
 
-            // Acknowledge Kafka message only after successful processing or confirmed duplicate handling
+            if (result == InboxEventProcessor.ProcessResult.QUARANTINED) {
+                log.warn("Kafka event key={} (eventId={}) was QUARANTINED due to poison payload. Acknowledging offset to unblock consumer pipeline.",
+                    record.key(), envelope.eventId());
+            }
+
+            // Acknowledge Kafka message after successful processing, confirmed duplicate, or poison event quarantine
             if (ack != null) {
                 ack.acknowledge();
             }
 
         } catch (Exception e) {
             log.error("Failed to process Kafka record key={}: {}", record.key(), e.getMessage());
-            // Do NOT acknowledge on exception; allow Kafka retry / container error handler to handle redelivery
+            // Do NOT acknowledge on unhandled exception; allow Kafka retry container to handle redelivery
             throw new RuntimeException("Kafka event processing failed for record key=" + record.key(), e);
         }
     }

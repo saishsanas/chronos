@@ -7,6 +7,7 @@ import com.chronos.application.port.InvalidEventEnvelopeException;
 import com.chronos.domain.event.DomainEventEnvelope;
 import com.chronos.domain.inbox.InboxEventRecord;
 import com.chronos.domain.inbox.InboxStatus;
+import com.chronos.infrastructure.observability.ChronosMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,30 +38,65 @@ public class InboxEventProcessor {
 
     private final InboxRepository inboxRepository;
     private final DownstreamEventConsumer downstreamEventConsumer;
+    private final ChronosMetrics metrics;
 
     public enum ProcessResult {
         PROCESSED,
-        DUPLICATE
+        DUPLICATE,
+        QUARANTINED
     }
 
     public InboxEventProcessor(
         InboxRepository inboxRepository,
         @Autowired(required = false) DownstreamEventConsumer downstreamEventConsumer
     ) {
-        this.inboxRepository = Objects.requireNonNull(inboxRepository, "inboxRepository must not be null");
-        this.downstreamEventConsumer = downstreamEventConsumer;
+        this(inboxRepository, downstreamEventConsumer, null);
     }
 
-    @Transactional
-    public ProcessResult process(DomainEventEnvelope envelope) {
-        // 1. Validate envelope integrity
-        validateEnvelope(envelope);
+    @Autowired
+    public InboxEventProcessor(
+        InboxRepository inboxRepository,
+        @Autowired(required = false) DownstreamEventConsumer downstreamEventConsumer,
+        @Autowired(required = false) ChronosMetrics metrics
+    ) {
+        this.inboxRepository = Objects.requireNonNull(inboxRepository, "inboxRepository must not be null");
+        this.downstreamEventConsumer = downstreamEventConsumer;
+        this.metrics = metrics;
+    }
 
-        // 2. Check for duplicate eventId in inbox
+    @Transactional(noRollbackFor = InvalidEventEnvelopeException.class)
+    public ProcessResult process(DomainEventEnvelope envelope) {
+        // 1. Validate envelope integrity with poison event quarantine
+        try {
+            validateEnvelope(envelope);
+        } catch (InvalidEventEnvelopeException e) {
+            log.error("Poison/Malformed event detected: {}. Quarantining event.", e.getMessage());
+            if (metrics != null) {
+                metrics.recordInboxPoison();
+            }
+            if (envelope != null && envelope.eventId() != null) {
+                Optional<InboxEventRecord> existing = inboxRepository.findByEventId(envelope.eventId());
+                if (existing.isPresent()) {
+                    inboxRepository.markQuarantined(existing.get().inboxId(), e.getMessage());
+                } else {
+                    inboxRepository.save(InboxEventRecord.createQuarantined(envelope, e.getMessage()));
+                }
+            }
+            throw e;
+        }
+
+        // 2. Check for duplicate/quarantined eventId in inbox
         Optional<InboxEventRecord> existing = inboxRepository.findByEventId(envelope.eventId());
-        if (existing.isPresent() && existing.get().status() == InboxStatus.PROCESSED) {
-            log.info("Duplicate event detected (eventId: {}). Ignoring business effect.", envelope.eventId());
-            return ProcessResult.DUPLICATE;
+        if (existing.isPresent()) {
+            if (existing.get().status() == InboxStatus.PROCESSED) {
+                log.info("Duplicate event detected (eventId: {}). Ignoring business effect.", envelope.eventId());
+                if (metrics != null) metrics.recordInboxDuplicate();
+                return ProcessResult.DUPLICATE;
+            } else if (existing.get().status() == InboxStatus.QUARANTINED) {
+                log.warn("Quarantined poison event encountered (eventId: {}). Skipping processing.", envelope.eventId());
+                if (metrics != null) metrics.recordInboxPoison();
+                return ProcessResult.QUARANTINED;
+            }
         }
 
         // 3. Sequence integrity check
@@ -103,11 +139,13 @@ public class InboxEventProcessor {
 
             log.info("Successfully processed inbox event (outboxId: {}, eventId: {}, aggregateId: {}, sequence: {})",
                 record.inboxId(), envelope.eventId(), envelope.aggregateId(), envelope.sequenceNumber());
+            if (metrics != null) metrics.recordInboxProcessed();
             return ProcessResult.PROCESSED;
 
         } catch (Exception e) {
             log.error("Failed to execute downstream processing for eventId {}: {}", envelope.eventId(), e.getMessage());
             inboxRepository.markFailed(record.inboxId(), e.getMessage());
+            if (metrics != null) metrics.recordInboxFailed();
             throw e;
         }
     }

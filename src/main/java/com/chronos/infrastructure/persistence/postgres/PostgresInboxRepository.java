@@ -103,6 +103,20 @@ public class PostgresInboxRepository implements InboxRepository {
     }
 
     @Override
+    @Transactional
+    public void markQuarantined(UUID inboxId, String lastError) {
+        Objects.requireNonNull(inboxId, "inboxId must not be null");
+        String sql = """
+            UPDATE inbox_events
+            SET status = 'QUARANTINED',
+                attempts = attempts + 1,
+                last_error = ?
+            WHERE inbox_id = ?
+            """;
+        jdbcTemplate.update(sql, lastError, inboxId);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public long getLastProcessedSequence(UUID aggregateId) {
         Objects.requireNonNull(aggregateId, "aggregateId must not be null");

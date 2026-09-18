@@ -93,11 +93,14 @@ flowchart TD
 | Guarantee | Mechanism / Implementation |
 | :--- | :--- |
 | **Immutable Source of Truth** | The `event_store` table is append-only. Events are never modified or deleted. |
+| **Database-Enforced Command Idempotency** | Unique constraint on `(actor_id, idempotency_key)` in `command_idempotency` with SHA-256 fingerprinting prevents race conditions and returns original results without duplicate event creation. Conflict reuse triggers HTTP 409. |
+| **Projection Rebuild & Atomic Cutover** | Zero-downtime projection rebuild from `event_store` via `account_summary_projection_staging` and atomic transaction swap (`TRUNCATE` + `INSERT SELECT`). Flushes Redis cache on activation. |
+| **Poison Event Quarantine** | Malformed Kafka payloads transition to `QUARANTINED` status in `inbox_events` with error details, preventing infinite consumer retries while unblocking the event bus. |
 | **Optimistic Concurrency Control (OCC)** | Aggregate versioning prevents sequence drift and lost updates under concurrent commands. |
 | **Inclusive Temporal Replay** | `stateAt(T)` reconstructs exact aggregate state for events where `recordedAt <= T`. |
 | **Atomic Outbox Publication** | `event_store` and `outbox_events` are populated in **one single PostgreSQL database transaction**. |
 | **Lock-Free Outbox Polling** | Outbox relay uses `FOR UPDATE SKIP LOCKED` for non-blocking concurrent worker scaling. |
-| **Idempotent Kafka Consumption** | `inbox_events` table with unique `event_id` constraint guarantees **no duplicate business execution**. |
+| **Inbox Consumer Idempotency** | `inbox_events` table with unique `event_id` constraint guarantees at-least-once Kafka transport is effectively idempotent at the consumer boundary. |
 | **CQRS Read Model Caching** | Low-latency `GET /summary` query via Redis cache (60s TTL) with automatic fallback to PostgreSQL. |
 | **Visual Temporal Audit** | React frontend provides interactive time-travel replay, sequence timeline, and JSON envelope inspection. |
 

@@ -47,4 +47,23 @@ public record InboxEventRecord(
             null
         );
     }
+
+    public static InboxEventRecord createQuarantined(DomainEventEnvelope envelope, String errorDetails) {
+        Objects.requireNonNull(envelope, "envelope must not be null");
+        Instant now = Instant.now();
+        return new InboxEventRecord(
+            UUID.randomUUID(),
+            envelope.eventId(),
+            envelope.aggregateId() != null ? envelope.aggregateId() : UUID.randomUUID(),
+            envelope.aggregateType() != null ? envelope.aggregateType() : "UNKNOWN",
+            envelope.sequenceNumber(),
+            envelope.eventType() != null ? envelope.eventType() : "UNKNOWN",
+            envelope.eventVersion(),
+            now,
+            null,
+            InboxStatus.QUARANTINED,
+            1,
+            errorDetails
+        );
+    }
 }
