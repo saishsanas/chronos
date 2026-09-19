@@ -172,9 +172,9 @@ When an authenticated operator or admin executes financial commands:
 
 | Username | Default Password | Assigned Roles | Scope |
 | :--- | :--- | :--- | :--- |
-| `admin` | `AdminPass123!` | `ROLE_ADMIN` | Full administrative control, projection rebuilds, audit reviews, sensitive actuator access |
-| `operator` | `OperatorPass123!` | `ROLE_OPERATOR` | Account creation, deposits, withdrawals, freezes, transaction limits |
-| `auditor` | `AuditorPass123!` | `ROLE_AUDITOR` | Read-only ledger verification, temporal inspector replay, security audit logs |
+| `admin` | `AdminSecret123!` | `ROLE_ADMIN` | Full administrative control, projection rebuilds, audit reviews, sensitive actuator access |
+| `operator` | `OperatorSecret123!` | `ROLE_OPERATOR` | Account creation, deposits, withdrawals, freezes, transaction limits |
+| `auditor` | `AuditorSecret123!` | `ROLE_AUDITOR` | Read-only ledger verification, temporal inspector replay, security audit logs |
 
 ---
 
@@ -209,7 +209,7 @@ When an authenticated operator or admin executes financial commands:
 ## 8. Swagger UI & Bearer JWT Testing
 
 1. Open **Swagger UI**: [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
-2. Expand `POST /api/v1/auth/login`, click **Try it out**, and log in with your credentials (e.g., `operator` / `OperatorPass123!`).
+2. Expand `POST /api/v1/auth/login`, click **Try it out**, and log in with your credentials (e.g., `operator` / `OperatorSecret123!`).
 3. Copy the returned `token` string from the JSON response.
 4. Click the green **Authorize** button at the top right of the Swagger UI page.
 5. In the **Value** field, paste the token (or `Bearer <token>`) and click **Authorize**.
@@ -270,3 +270,5 @@ Once started, access:
 
 ## 11. License
 Apache License 2.0. Built for production demonstration and technical portfolio review.
+
+
