@@ -33,6 +33,22 @@ public class ChronosMetrics {
         meterRegistry.counter("chronos.command.idempotency.conflict").increment();
     }
 
+    public void recordSecurityLoginSuccess() {
+        meterRegistry.counter("chronos.security.login.success").increment();
+    }
+
+    public void recordSecurityLoginFailure() {
+        meterRegistry.counter("chronos.security.login.failure").increment();
+    }
+
+    public void recordSecurityAccessDenied() {
+        meterRegistry.counter("chronos.security.access.denied").increment();
+    }
+
+    public void recordSecurityAuditWriteFailure() {
+        meterRegistry.counter("chronos.security.audit.write.failure").increment();
+    }
+
     public void recordEventStoreAppend(boolean success) {
         meterRegistry.counter("chronos.eventstore.append", "outcome", success ? "SUCCESS" : "FAILURE").increment();
     }

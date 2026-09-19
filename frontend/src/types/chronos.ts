@@ -59,8 +59,18 @@ export interface CommandExecutionResponse {
 
 export interface ApiErrorResponse {
   status: number;
-  error: string;
+  errorCode?: string;
+  error?: string;
   message: string;
   correlationId: string;
   timestamp: string;
+}
+
+export interface LoginResponse {
+  accessToken: string;
+  tokenType: string;
+  expiresIn: number;
+  userId: string;
+  username: string;
+  roles: string[];
 }

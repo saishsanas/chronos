@@ -109,16 +109,81 @@ flowchart TD
 ## 4. Technology Stack
 - **Backend:** Java 21 LTS, Spring Boot 3.3.4 (MVC, JDBC, Kafka, Redis, Actuator, Validation)
 - **Frontend:** React 19, Vite, TypeScript 5.6, Tailwind CSS, Lucide Icons
-- **Database & Migration:** PostgreSQL 16, Flyway Migration (`V1` to `V5`)
+- **Database & Migration:** PostgreSQL 16, Flyway Migration (`V1` to `V10`)
+- **Security & Auth:** Spring Security 6.3, Nimbus JOSE JWT (HMAC-SHA256), BCrypt Password Hashing, RBAC
 - **Messaging & Cache:** Apache Kafka 7.6.0 (KRaft mode), Redis 7
-- **Documentation & Metrics:** SpringDoc OpenAPI 2.6.0 (Swagger UI), Micrometer Telemetry
+- **Documentation & Metrics:** SpringDoc OpenAPI 2.6.0 (Swagger UI Bearer JWT), Micrometer Telemetry
 - **Containerization & CI:** Docker, Docker Compose, GitHub Actions
 
 ---
 
-## 5. REST API Reference
+## 5. Security Architecture & RBAC
 
-### Command Endpoints
+Chronos implements enterprise-grade, defense-in-depth security designed for financial core systems:
+
+```mermaid
+flowchart LR
+    Client["Client / React UI"] -->|1. POST /api/v1/auth/login| AuthCtrl["AuthController"]
+    AuthCtrl -->|Verify BCrypt| UserRepo[("application_users & user_roles")]
+    AuthCtrl -->|2. Issue HMAC-SHA256 JWT| Client
+
+    Client -->|3. Request with Bearer JWT| SecFilter["JwtAuthenticationFilter"]
+    SecFilter -->|Validate & Extract Principal| SecCtx["SecurityContext (userId, username, roles)"]
+    SecCtx -->|4. Authorize via RBAC| Endpoints{"Controller Boundary"}
+
+    Endpoints -->|OPERATOR / ADMIN| CmdCtrl["AccountController (Binds actorId = userId)"]
+    Endpoints -->|ADMIN| OpsCtrl["AccountOpsController (Projection Rebuild)"]
+    Endpoints -->|AUDITOR / ADMIN| AuditCtrl["SecurityAuditController (Audit Trail)"]
+    Endpoints -->|ADMIN only| Actuator["Actuator Management (/metrics, /env)"]
+
+    CmdCtrl -->|Completed Authoritative Command| AuditService["SecurityAuditService (Non-blocking)"]
+    OpsCtrl -->|Completed Projection Rebuild| AuditService
+    AuditService -->|Append-Only Write| AuditLog[("security_audit_log")]
+```
+
+### Role-Based Access Control (RBAC) Matrix
+
+| Endpoint / Resource | Anonymous | `OPERATOR` | `AUDITOR` | `ADMIN` |
+| :--- | :---: | :---: | :---: | :---: |
+| `POST /api/v1/auth/login` | Permit | Permit | Permit | Permit |
+| `GET /actuator/health`, `/actuator/info` | Permit | Permit | Permit | Permit |
+| `GET /api/v1/accounts/**` (State & Events) | Deny (401) | Allow | Allow | Allow |
+| `POST /api/v1/accounts/**` (Financial Commands) | Deny (401) | Allow | Deny (403) | Allow |
+| `POST /api/v1/ops/projections/**` (Rebuild Projections) | Deny (401) | Deny (403) | Deny (403) | Allow |
+| `GET /api/v1/ops/audit` (Security Audit Log) | Deny (401) | Deny (403) | Allow | Allow |
+| `/actuator/**` (Metrics, Env, Beans, etc.) | Deny (401) | Deny (403) | Deny (403) | Allow |
+
+### Actor Identity Binding
+When an authenticated operator or admin executes financial commands:
+- `CommandContext.actorId` is **authoritatively bound** to the verified user's immutable `userId` UUID from the JWT subject (`principal.userId().toString()`).
+- Clients cannot spoof actor identities or tamper with idempotency deduplication scopes (`actor_id`, `idempotency_key`).
+- Domain event contracts and reducer state transitions remain pure, deterministic, and security-agnostic.
+
+### Resilient Append-Only Audit Logging
+- Security events (`LOGIN_SUCCESS`, `LOGIN_FAILURE`, `ACCOUNT_COMMAND`, `PROJECTION_REBUILD`, `ACCESS_DENIED`) are durably recorded to PostgreSQL `security_audit_log`.
+- In accordance with financial event sourcing principles, `event_store` is the sole authoritative source of truth. Audit persistence runs with decoupled try-catch boundary; failure to persist an audit log records an error metric (`chronos.security.audit.write.failure`) without aborting or rolling back financial transactions.
+
+---
+
+## 6. Local Development Credentials (DEV / TEST ONLY)
+
+> [!WARNING]
+> The credentials below are provisioned **strictly for local development and integration testing** when `chronos.security.bootstrap-dev-users: true` is explicitly configured. Production configurations default this property to `false` and require external user directory management.
+
+| Username | Default Password | Assigned Roles | Scope |
+| :--- | :--- | :--- | :--- |
+| `admin` | `AdminPass123!` | `ROLE_ADMIN` | Full administrative control, projection rebuilds, audit reviews, sensitive actuator access |
+| `operator` | `OperatorPass123!` | `ROLE_OPERATOR` | Account creation, deposits, withdrawals, freezes, transaction limits |
+| `auditor` | `AuditorPass123!` | `ROLE_AUDITOR` | Read-only ledger verification, temporal inspector replay, security audit logs |
+
+---
+
+## 7. REST API Reference
+
+### Authentication
+- `POST /api/v1/auth/login` — Authenticate with username and password, returns Bearer JWT with roles and expiration
+
+### Financial Command Endpoints (Requires `OPERATOR` or `ADMIN`)
 - `POST /api/v1/accounts` — Create a new account aggregate
 - `POST /api/v1/accounts/{id}/deposits` — Deposit funds into account
 - `POST /api/v1/accounts/{id}/withdrawals` — Withdraw funds (enforces transaction & overdraft limits)
@@ -129,25 +194,47 @@ flowchart TD
 - `POST /api/v1/accounts/{id}/corrections` — Issue financial reversal/adjustment correction
 - `POST /api/v1/accounts/{id}/close` — Close zero-balance account
 
-### Query & Temporal Endpoints
+### Query & Temporal Endpoints (Requires `OPERATOR`, `AUDITOR`, or `ADMIN`)
 - `GET /api/v1/accounts/{id}` — Reconstruct current state from snapshot and event stream
 - `GET /api/v1/accounts/{id}/summary` — CQRS read model summary (Redis cached with PostgreSQL fallback)
 - `GET /api/v1/accounts/{id}/state-at?at=<ISO-8601>` — Reconstruct historical state at timestamp $T$ (`recordedAt <= T`)
 - `GET /api/v1/accounts/{id}/events` — Fetch full immutable event history (`ORDER BY sequenceNumber ASC`)
 
+### Operations & Security Audit (Requires `ADMIN` / `AUDITOR`)
+- `POST /api/v1/ops/projections/account-summary/rebuild` — Trigger zero-downtime projection rebuild (`ADMIN` only)
+- `GET /api/v1/ops/audit` — Query bounded security audit log trail (`ADMIN` or `AUDITOR`)
+
 ---
 
-## 6. Observability & Telemetry
+## 8. Swagger UI & Bearer JWT Testing
 
-### Spring Boot Actuator & UI Dashboard
-- **React UI Dashboard:** [http://localhost:5173](http://localhost:5173) (or Docker container port `5173`)
+1. Open **Swagger UI**: [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
+2. Expand `POST /api/v1/auth/login`, click **Try it out**, and log in with your credentials (e.g., `operator` / `OperatorPass123!`).
+3. Copy the returned `token` string from the JSON response.
+4. Click the green **Authorize** button at the top right of the Swagger UI page.
+5. In the **Value** field, paste the token (or `Bearer <token>`) and click **Authorize**.
+6. All subsequent command and query endpoints will execute with the authenticated Bearer token.
+
+---
+
+## 9. Observability & Telemetry
+
+### Actuator Endpoints & Security Posture
+- **React UI Dashboard:** [http://localhost:5173](http://localhost:5173)
 - **Swagger UI:** [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
-- **Health Check:** [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health)
-- **Operational Metrics:** [http://localhost:8080/actuator/metrics](http://localhost:8080/actuator/metrics)
+- **Health Check (Public):** [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health)
+- **Info (Public):** [http://localhost:8080/actuator/info](http://localhost:8080/actuator/info)
+- **Operational Metrics (`ADMIN` only):** [http://localhost:8080/actuator/metrics](http://localhost:8080/actuator/metrics)
+
+### Security Metrics (Micrometer)
+- `chronos.security.login.success` — Counter of successful user authentications
+- `chronos.security.login.failure` — Counter of failed authentication attempts
+- `chronos.security.access.denied` — Counter of RBAC authorization rejections (HTTP 403)
+- `chronos.security.audit.write.failure` — Counter of failed security audit log persistence attempts
 
 ---
 
-## 7. Local Execution & Demo Guide
+## 10. Local Execution & Test Guide
 
 ### Prerequisites
 - JDK 21
@@ -155,9 +242,9 @@ flowchart TD
 - Maven 3.9+
 - Docker & Docker Compose
 
-### 1. Run Backend Unit & Integration Tests (97 Passing Tests)
+### 1. Run Complete Test Suite (166 Tests)
 ```bash
-$env:JAVA_HOME="C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot\"
+$env:JAVA_HOME="C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot"
 mvn clean test
 ```
 
@@ -170,6 +257,8 @@ npm run build
 
 ### 3. Run Full System via Docker Compose
 ```bash
+# Set secure JWT secret for local compose environment
+$env:CHRONOS_JWT_SECRET="dev-insecure-only-secret-for-chronos-docker-compose-minimum-256-bits-ok!"
 docker compose up --build
 ```
 Once started, access:
@@ -179,5 +268,5 @@ Once started, access:
 
 ---
 
-## 8. License
+## 11. License
 Apache License 2.0. Built for production demonstration and technical portfolio review.

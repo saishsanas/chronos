@@ -8,15 +8,19 @@ import { EventTimeline } from './components/EventTimeline';
 import { TemporalInspector } from './components/TemporalInspector';
 import { ErrorAlert } from './components/ErrorAlert';
 import { EventDetailsModal } from './components/EventDetailsModal';
+import { LoginModal } from './components/LoginModal';
 import { chronosApi } from './api/client';
 import type {
   AccountStateResponse,
   AccountSummaryResponse,
   CommandExecutionResponse,
-  EventEnvelopeResponse
+  EventEnvelopeResponse,
+  LoginResponse
 } from './types/chronos';
 
 export const App: React.FC = () => {
+  const [currentUser, setCurrentUser] = useState<LoginResponse | null>(null);
+  const [isLoginOpen, setIsLoginOpen] = useState<boolean>(false);
   const [accountId, setAccountId] = useState<string>('');
   const [currentState, setCurrentState] = useState<AccountStateResponse | null>(null);
   const [summary, setSummary] = useState<AccountSummaryResponse | null>(null);
@@ -75,7 +79,14 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#0b0f19] text-slate-100 font-sans flex flex-col selection:bg-cyan-500/30 selection:text-cyan-200">
-      <Navbar />
+      <Navbar
+        currentUser={currentUser}
+        onOpenLogin={() => setIsLoginOpen(true)}
+        onLogout={() => {
+          chronosApi.logout();
+          setCurrentUser(null);
+        }}
+      />
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
         {/* Error Notification Banner */}
@@ -124,6 +135,13 @@ export const App: React.FC = () => {
 
       {/* Event JSON Modal */}
       <EventDetailsModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
+
+      {/* Login Modal */}
+      <LoginModal
+        isOpen={isLoginOpen}
+        onClose={() => setIsLoginOpen(false)}
+        onLoginSuccess={(user) => setCurrentUser(user)}
+      />
 
       {/* Footer */}
       <footer className="border-t border-slate-900 bg-slate-950 py-4 px-6 text-center text-xs font-mono text-slate-500">

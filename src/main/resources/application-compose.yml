@@ -11,3 +11,8 @@ chronos:
     topic: chronos.events.v1
     consumer:
       group-id: chronos-engine-compose-v1
+  security:
+    jwt:
+      secret: ${CHRONOS_JWT_SECRET:local-compose-dev-deterministic-secret-32-bytes-long!}
+      expiration-seconds: 3600
+    bootstrap-dev-users: ${CHRONOS_BOOTSTRAP_DEV_USERS:true}

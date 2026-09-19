@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
+@org.springframework.security.test.context.support.WithMockUser(username = "operator", roles = {"OPERATOR"})
 class CommandIdempotencyIntegrationTest {
 
     @DynamicPropertySource
@@ -102,9 +103,12 @@ class CommandIdempotencyIntegrationTest {
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger conflictCount = new AtomicInteger(0);
 
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+
         for (int i = 0; i < threads; i++) {
             executor.submit(() -> {
                 try {
+                    org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(auth);
                     latch.await();
                     accountController.createAccount(req, idempotencyKey, null, null);
                     successCount.incrementAndGet();

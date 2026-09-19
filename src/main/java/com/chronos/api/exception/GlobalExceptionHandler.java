@@ -58,6 +58,34 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
+    // 401 Unauthorized
+    @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
+    public ResponseEntity<ApiErrorResponse> handleUnauthorized(org.springframework.security.core.AuthenticationException ex, HttpServletRequest request) {
+        log.warn("Unauthorized [{}]: {}", request.getRequestURI(), ex.getMessage());
+        ApiErrorResponse body = ApiErrorResponse.of(
+            HttpStatus.UNAUTHORIZED.value(),
+            "UNAUTHORIZED",
+            "Authentication required or credentials invalid",
+            request.getRequestURI(),
+            getCorrelationId(request)
+        );
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(body);
+    }
+
+    // 403 Forbidden
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<ApiErrorResponse> handleAccessDenied(org.springframework.security.access.AccessDeniedException ex, HttpServletRequest request) {
+        log.warn("Access Denied [{}]: {}", request.getRequestURI(), ex.getMessage());
+        ApiErrorResponse body = ApiErrorResponse.of(
+            HttpStatus.FORBIDDEN.value(),
+            "FORBIDDEN",
+            "Access denied: insufficient role or permission",
+            request.getRequestURI(),
+            getCorrelationId(request)
+        );
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+    }
+
     // 404 Not Found
     @ExceptionHandler(AccountNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleNotFound(AccountNotFoundException ex, HttpServletRequest request) {

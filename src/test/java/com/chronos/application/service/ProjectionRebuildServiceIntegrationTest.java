@@ -22,6 +22,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
+@org.springframework.security.test.context.support.WithMockUser(username = "admin", roles = {"ADMIN", "OPERATOR"})
 class ProjectionRebuildServiceIntegrationTest {
 
     @DynamicPropertySource

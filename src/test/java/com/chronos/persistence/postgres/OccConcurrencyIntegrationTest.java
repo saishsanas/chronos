@@ -47,6 +47,7 @@ class OccConcurrencyIntegrationTest {
     }
 
     @Test
+    @org.springframework.security.test.context.support.WithMockUser(username = "operator", roles = {"OPERATOR"})
     @DisplayName("Concurrent deposits against same aggregate trigger OCC conflict preventing silent lost updates")
     void occConcurrencyCheck() throws Exception {
         var createRes = accountController.createAccount(new CreateAccountRequest("USD", 1000L, 500L), null, null, null).getBody();
@@ -60,10 +61,13 @@ class OccConcurrencyIntegrationTest {
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger occConflictCount = new AtomicInteger(0);
 
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+
         for (int i = 0; i < threads; i++) {
             final int index = i;
             executor.submit(() -> {
                 try {
+                    org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(auth);
                     latch.await();
                     // Each thread attempts deposit without unique idempotency key to force direct OCC race on event store
                     accountController.deposit(accountId, new DepositRequest(100L * (index + 1), "USD"), null, null, null);

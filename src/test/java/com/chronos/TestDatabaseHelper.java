@@ -8,12 +8,18 @@ import java.sql.Statement;
 
 public class TestDatabaseHelper {
 
+    public static final String TEST_JWT_SECRET = "test-deterministic-jwt-secret-key-at-least-32-chars-long!";
+
     public static void configureProperties(DynamicPropertyRegistry registry) {
         String containerUrl = "jdbc:postgresql://localhost:5432/chronos_db";
         String testDbUrl = "jdbc:postgresql://localhost:5432/chronos_test_db";
 
         // Disable automatic Kafka listener startup during repository/unit tests by default
         registry.add("spring.kafka.listener.auto-startup", () -> "false");
+
+        // Provide test deterministic JWT secret and test dev user bootstrap
+        registry.add("chronos.security.jwt.secret", () -> TEST_JWT_SECRET);
+        registry.add("chronos.security.bootstrap-dev-users", () -> "true");
 
         // Check if Postgres container is running on 5432 with chronos_user
         try (Connection conn = DriverManager.getConnection(containerUrl, "chronos_user", "chronos_password")) {

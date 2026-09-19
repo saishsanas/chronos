@@ -44,6 +44,7 @@ public class OperationalObservabilityTest {
     }
 
     @Test
+    @org.springframework.security.test.context.support.WithMockUser(roles = "ADMIN")
     @DisplayName("2. Actuator metrics endpoint is exposed and returns HTTP 200 OK")
     void testActuatorMetricsEndpoint() throws Exception {
         mockMvc.perform(get("/actuator/metrics"))
