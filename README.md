@@ -268,7 +268,30 @@ Once started, access:
 
 ---
 
-## 11. License
+## 11. Performance Benchmarking & Scale Validation (Wave 4)
+
+Chronos includes an isolated, reproducible performance benchmark harness that empirically measures the engine under growing volume (10k, 50k, 100k events), diverse access patterns, and concurrent load without modifying or bypassing Waves 1–3 correctness, OCC, or security boundaries.
+
+### Benchmark Highlights (100k Scale Baseline)
+- **Full Replay**: 100,000 events replayed from PostgreSQL in **615.9 ms** (~162,350 events/sec sustained throughput).
+- **Snapshot Acceleration**: 90% snapshot placement avoids 90,000 tail events, hydrating state in **60.2 ms** (**10.2x wall-clock speedup**).
+- **Zero-Downtime Projection Rebuild**: Rebuilding read model across 500 accounts (100,000 events) completes in **1.42 seconds** via staging tables and atomic live cutover.
+- **CQRS Read Model Latency**: Low-latency Redis cache reads (**1.45 ms**) vs PostgreSQL projection reads (**1.13 ms** direct / **4.38 ms** on miss + fallback).
+- **OCC Under Contention**: 8 concurrent workers executing transactions against a single account achieve clean serialized commits while rejecting 68 expected race collisions via `OptimisticConcurrencyException` without sequence drift.
+- **In-Memory Schema Evolution**: Legacy v1 $\to$ v2 upcasting overhead measured at **74 ns/event** via JMH 1.37 while strictly maintaining raw PostgreSQL event store immutability.
+
+### Running Benchmarks
+Benchmarks are isolated in `chronos_bench_db` and do not run during standard correctness builds:
+```powershell
+# Run primary benchmark suite (10k, 50k, 100k events)
+.\scripts\run-benchmarks.ps1
+```
+
+For full methodology, statistical analysis, environment profile, and raw metrics tables, see the [Wave 4 Benchmark Report](docs/performance/WAVE4_BENCHMARK_REPORT.md).
+
+---
+
+## 12. License
 Apache License 2.0. Built for production demonstration and technical portfolio review.
 
 
