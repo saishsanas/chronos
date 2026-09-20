@@ -1,7 +1,7 @@
 # Chronos Engine v1.0
 > **Time-Traveling State Reconstruction Engine with Transactional Event Sourcing, Asynchronous Kafka Broadcast, CQRS Read Model Caching, and React Temporal Visualization Dashboard.**
 
-[![Build & Test](https://github.com/saish/chronos-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/saish/chronos-engine/actions/workflows/ci.yml)
+[![Build & Test](https://github.com/saishsanas/chronos/actions/workflows/ci.yml/badge.svg)](https://github.com/saishsanas/chronos/actions/workflows/ci.yml)
 [![Java 21](https://img.shields.io/badge/Java-21-orange.svg)](https://openjdk.org/projects/jdk/21/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3.4-brightgreen.svg)](https://spring.io/projects/spring-boot)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
@@ -34,6 +34,7 @@ flowchart TD
 
     subgraph DomainApp ["Application & Domain Engine"]
         Processor["AccountCommandProcessor"]
+        Upcaster["EventUpcasterRegistry (Dynamic Schema Evolution)"]
         Reducer["AccountReducer"]
         Reconstructor["TemporalStateReconstructor"]
         SummaryService["AccountSummaryQueryService"]
@@ -69,6 +70,8 @@ flowchart TD
     SummaryService -->|2. Fallback Read| ReadProjection
 
     Processor -->|Load Stream| EventStore
+    EventStore -->|Raw Envelopes| Upcaster
+    Upcaster -->|Canonical Events| Reducer
     Processor -->|Apply Events| Reducer
     Processor -->|Atomic Write| EventStore
     Processor -->|Atomic Write| OutboxTable
@@ -93,6 +96,7 @@ flowchart TD
 | Guarantee | Mechanism / Implementation |
 | :--- | :--- |
 | **Immutable Source of Truth** | The `event_store` table is append-only. Events are never modified or deleted. |
+| **Deterministic Schema Upcasting** | Dynamic in-memory migration of legacy events (v1 -> v2) via `EventUpcasterRegistry` while strictly preserving raw event store immutability. |
 | **Database-Enforced Command Idempotency** | Unique constraint on `(actor_id, idempotency_key)` in `command_idempotency` with SHA-256 fingerprinting prevents race conditions and returns original results without duplicate event creation. Conflict reuse triggers HTTP 409. |
 | **Projection Rebuild & Atomic Cutover** | Zero-downtime projection rebuild from `event_store` via `account_summary_projection_staging` and atomic transaction swap (`TRUNCATE` + `INSERT SELECT`). Flushes Redis cache on activation. |
 | **Poison Event Quarantine** | Malformed Kafka payloads transition to `QUARANTINED` status in `inbox_events` with error details, preventing infinite consumer retries while unblocking the event bus. |
@@ -217,13 +221,13 @@ When an authenticated operator or admin executes financial commands:
 
 ---
 
-## 9. Observability & Telemetry
+## 9. Application Entry Points & Observability
 
-### Actuator Endpoints & Security Posture
-- **React UI Dashboard:** [http://localhost:5173](http://localhost:5173)
-- **Swagger UI:** [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
+### Endpoints & Security Posture
+- **Temporal Dashboard UI (React):** [http://localhost:5173](http://localhost:5173)
+- **Interactive Swagger UI:** [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
 - **Health Check (Public):** [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health)
-- **Info (Public):** [http://localhost:8080/actuator/info](http://localhost:8080/actuator/info)
+- **Application Info (Public):** [http://localhost:8080/actuator/info](http://localhost:8080/actuator/info)
 - **Operational Metrics (`ADMIN` only):** [http://localhost:8080/actuator/metrics](http://localhost:8080/actuator/metrics)
 
 ### Security Metrics (Micrometer)
@@ -242,29 +246,30 @@ When an authenticated operator or admin executes financial commands:
 - Maven 3.9+
 - Docker & Docker Compose
 
-### 1. Run Complete Test Suite (166 Tests)
+### 1. Run Complete Test Suite (172 Tests)
 ```bash
-$env:JAVA_HOME="C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot"
 mvn clean test
 ```
+> [!NOTE]
+> Requires JDK 21. If multiple Java versions are installed on your workstation, configure your `JAVA_HOME` environment variable to point to your JDK 21 installation prior to running Maven.
 
 ### 2. Run Frontend Build
 ```bash
 cd frontend
 npm install
 npm run build
+cd ..
 ```
 
 ### 3. Run Full System via Docker Compose
 ```bash
-# Set secure JWT secret for local compose environment
-$env:CHRONOS_JWT_SECRET="dev-insecure-only-secret-for-chronos-docker-compose-minimum-256-bits-ok!"
+# Set a 256-bit JWT signing secret for local environment
+export CHRONOS_JWT_SECRET="dev-insecure-only-secret-for-chronos-docker-compose-minimum-256-bits-ok!"
+# On Windows PowerShell: $env:CHRONOS_JWT_SECRET="dev-insecure-only-secret-for-chronos-docker-compose-minimum-256-bits-ok!"
+
 docker compose up --build
 ```
-Once started, access:
-- **Temporal Dashboard UI:** [http://localhost:5173](http://localhost:5173)
-- **Swagger UI:** [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
-- **Backend Actuator Health:** [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health)
+Once initialized, access the dashboard, Swagger UI, and health check via the URLs listed in [Section 9 (Application Entry Points & Observability)](#9-application-entry-points--observability).
 
 ---
 

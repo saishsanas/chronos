@@ -1,9 +1,9 @@
 # Chronos: Time-Traveling State Reconstruction Engine
 ## Technical Specification Document v1.0
-**Status:** Draft (Phase 0)  
-**Author / Role:** Antigravity (Implementation Engineer)  
-**Owner / Developer:** Saish  
-**Technical Lead:** Lead AI (ChatGPT)  
+- **Status:** Architecture Draft (Phase 0 Baseline)
+- **Project Lead / Author:** Saish Sanas
+- **Development Approach:** AI-assisted engineering
+- **Engineering Note:** Architecture, specifications, and implementation were developed by Saish Sanas using AI-assisted software engineering workflows.
 
 ---
 

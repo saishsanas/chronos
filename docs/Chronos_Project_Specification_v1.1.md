@@ -1,13 +1,11 @@
 # Chronos — Project Specification v1.1
 
-**Project:** Chronos — Time-Traveling State Reconstruction Engine  
-**Version:** 1.1  
-**Status:** Architecture/Specification Baseline — Phase 1 Ready  
-**Project Owner:** Saish Sanas  
-**Lead AI / Technical Lead:** ChatGPT  
-**Implementation Engineer:** Antigravity  
-**Critical Reviewer:** Claude  
-**Research / Specialist Engineer:** Gemini  
+- **Project:** Chronos — Time-Traveling State Reconstruction Engine
+- **Version:** 1.1
+- **Status:** Architecture/Specification Baseline — Phase 1 Ready
+- **Project Lead / Author:** Saish Sanas
+- **Development Approach:** AI-assisted engineering
+- **Engineering Note:** Architecture, domain models, and technical specifications were developed by Saish Sanas using AI-assisted engineering workflows.
 
 ---
 

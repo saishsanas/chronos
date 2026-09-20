@@ -1,4 +1,4 @@
-package com.chronos.persistence.postgres;
+package com.chronos.infrastructure.persistence.postgres;
 
 import com.chronos.TestDatabaseHelper;
 import com.chronos.api.controller.AccountController;
