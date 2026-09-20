@@ -3,9 +3,8 @@
 **Status:** Authoritative Specification Baseline (v1.2 — Cleaned)  
 **Version:** 1.2  
 **Domain:** Financial Account / Ledger Aggregate (Reference Domain)  
-**Project Owner:** Saish Sanas  
-**Lead AI / Technical Lead:** ChatGPT  
-**Implementation Engineer:** Antigravity  
+**Project Lead / Author:** Saish Sanas
+**Development Approach:** AI-assisted engineering
 
 ---
 
