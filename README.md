@@ -14,6 +14,14 @@
 ## 1. Project Purpose
 Traditional CRUD financial applications suffer from state mutability, audit trail destruction, and lack of temporal visibility into historical system states. **Chronos** solves these challenges by implementing an immutable **Event Sourcing** architecture with **Snapshot Optimization**, **Transactional Outbox Messaging**, **Idempotent Kafka Consumer Processing**, **CQRS Read Model Projections with Redis Caching**, and **Inclusive Temporal State Reconstruction (`stateAt(T)`)** served via a **Dark-First React Observability Dashboard**.
 
+### User Interface & Observability Dashboard
+
+![Chronos Dashboard](docs/images/chronos-dashboard.png)
+*Chronos dashboard — reconstructed account state, domain commands, and temporal replay controls.*
+
+![Chronos Temporal Replay](docs/images/chronos-temporal-replay.png)
+*Temporal reconstruction — historical state at T compared with the current aggregate head.*
+
 ---
 
 ## 2. High-Level Architecture
