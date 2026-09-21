@@ -23,7 +23,7 @@ import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.DockerClientFactory;
-import org.testcontainers.kafka.KafkaContainer;
+import org.testcontainers.kafka.ConfluentKafkaContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import java.nio.charset.StandardCharsets;
@@ -40,7 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest
 public class OutboxKafkaTestcontainersTest {
 
-    private static KafkaContainer kafkaContainer;
+    private static ConfluentKafkaContainer kafkaContainer;
 
     @BeforeAll
     static void checkDockerEnvironment() {
@@ -53,23 +53,20 @@ public class OutboxKafkaTestcontainersTest {
 
         Assumptions.assumeTrue(dockerAvailable, "Docker environment is required for Testcontainers Kafka integration test");
 
-        kafkaContainer = new KafkaContainer(
-                DockerImageName.parse("confluentinc/cp-kafka:7.6.0").asCompatibleSubstituteFor("apache/kafka")
+        kafkaContainer = new ConfluentKafkaContainer(
+                DockerImageName.parse("confluentinc/cp-kafka:7.6.0")
         );
         kafkaContainer.start();
     }
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
+        com.chronos.TestDatabaseHelper.configureProperties(registry);
         if (kafkaContainer != null && kafkaContainer.isRunning()) {
             registry.add("spring.kafka.bootstrap-servers", kafkaContainer::getBootstrapServers);
         } else {
             registry.add("spring.kafka.bootstrap-servers", () -> "localhost:9092");
         }
-        registry.add("spring.datasource.url", () -> "jdbc:postgresql://localhost:5432/chronos_test_db");
-        registry.add("spring.datasource.username", () -> "test_user");
-        registry.add("spring.datasource.password", () -> "test_password");
-        registry.add("spring.flyway.locations", () -> "classpath:db/migration");
         registry.add("chronos.kafka.topic", () -> "chronos.events.tc.v1");
         registry.add("spring.kafka.producer.acks", () -> "all");
     }
