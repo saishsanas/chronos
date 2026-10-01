@@ -139,7 +139,7 @@ public class AuthenticationIntegrationTest {
     @DisplayName("5. Root URL / returns 302 redirecting to /swagger-ui/index.html")
     void rootUrlRedirectsToSwagger() throws Exception {
         mockMvc.perform(get("/"))
-            .andExpect(status().is3xxRedirection())
+            .andExpect(status().isFound())
             .andExpect(redirectedUrl("/swagger-ui/index.html"));
     }
 }
