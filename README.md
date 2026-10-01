@@ -1,6 +1,16 @@
 # Chronos Engine v1.0
 > **Time-Traveling State Reconstruction Engine with Transactional Event Sourcing, Asynchronous Kafka Broadcast, CQRS Read Model Caching, and React Temporal Visualization Dashboard.**
 
+### Live Demo
+
+**🌐 Live Application:** https://chronos-frontend-g0m4.onrender.com
+
+**⚙️ Backend API:** https://chronos-engine-4mci.onrender.com
+
+**📖 Swagger / API Docs:** https://chronos-engine-4mci.onrender.com/swagger-ui/index.html
+
+**💻 GitHub Repository:** https://github.com/saishsanas/chronos
+
 [![Build & Test](https://github.com/saishsanas/chronos/actions/workflows/ci.yml/badge.svg)](https://github.com/saishsanas/chronos/actions/workflows/ci.yml)
 [![Java 21](https://img.shields.io/badge/Java-21-orange.svg)](https://openjdk.org/projects/jdk/21/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3.4-brightgreen.svg)](https://spring.io/projects/spring-boot)
@@ -11,7 +21,30 @@
 
 ---
 
-## 1. Project Purpose
+## 1. Live Deployment
+
+Chronos is publicly deployed on a zero-cost ($0 / ₹0) cloud infrastructure architecture:
+
+```
+React / Vite Frontend
+        ↓
+Render Free Static Site (chronos-frontend)
+        ↓
+Spring Boot REST API (chronos-engine)
+        ↓
+Neon Free PostgreSQL
+```
+
+- **Live Dashboard:** https://chronos-frontend-g0m4.onrender.com
+- **Live REST API:** https://chronos-engine-4mci.onrender.com
+- **Swagger / API Docs:** https://chronos-engine-4mci.onrender.com/swagger-ui/index.html
+- **Database Provider:** Neon Serverless PostgreSQL (Free Tier)
+- **Deployment Platform:** Render Cloud Platform (Free Web Service + Free Static Site)
+- **Zero-Cost Guarantee:** Entire stack runs within 100% free-tier resource allocation ($0 / ₹0).
+
+---
+
+## 2. Project Purpose
 Traditional CRUD financial applications suffer from state mutability, audit trail destruction, and lack of temporal visibility into historical system states. **Chronos** solves these challenges by implementing an immutable **Event Sourcing** architecture with **Snapshot Optimization**, **Transactional Outbox Messaging**, **Idempotent Kafka Consumer Processing**, **CQRS Read Model Projections with Redis Caching**, and **Inclusive Temporal State Reconstruction (`stateAt(T)`)** served via a **Dark-First React Observability Dashboard**.
 
 ### User Interface & Observability Dashboard
@@ -24,7 +57,7 @@ Traditional CRUD financial applications suffer from state mutability, audit trai
 
 ---
 
-## 2. High-Level Architecture
+## 3. High-Level Architecture
 
 ```mermaid
 flowchart TD
@@ -99,7 +132,7 @@ flowchart TD
 
 ---
 
-## 3. Core Architectural Guarantees
+## 4. Core Architectural Guarantees
 
 | Guarantee | Mechanism / Implementation |
 | :--- | :--- |
@@ -118,7 +151,7 @@ flowchart TD
 
 ---
 
-## 4. Technology Stack
+## 5. Technology Stack
 - **Backend:** Java 21 LTS, Spring Boot 3.3.4 (MVC, JDBC, Kafka, Redis, Actuator, Validation)
 - **Frontend:** React 19, Vite, TypeScript 5.6, Tailwind CSS, Lucide Icons
 - **Database & Migration:** PostgreSQL 16, Flyway Migration (`V1` to `V10`)
@@ -129,7 +162,7 @@ flowchart TD
 
 ---
 
-## 5. Security Architecture & RBAC
+## 6. Security Architecture & RBAC
 
 Chronos implements enterprise-grade, defense-in-depth security designed for financial core systems:
 
@@ -171,26 +204,21 @@ When an authenticated operator or admin executes financial commands:
 - Clients cannot spoof actor identities or tamper with idempotency deduplication scopes (`actor_id`, `idempotency_key`).
 - Domain event contracts and reducer state transitions remain pure, deterministic, and security-agnostic.
 
-### Resilient Append-Only Audit Logging
-- Security events (`LOGIN_SUCCESS`, `LOGIN_FAILURE`, `ACCOUNT_COMMAND`, `PROJECTION_REBUILD`, `ACCESS_DENIED`) are durably recorded to PostgreSQL `security_audit_log`.
-- In accordance with financial event sourcing principles, `event_store` is the sole authoritative source of truth. Audit persistence runs with decoupled try-catch boundary; failure to persist an audit log records an error metric (`chronos.security.audit.write.failure`) without aborting or rolling back financial transactions.
+---
+
+## 7. Role Privileges & Security Posture
+
+Development and demonstration accounts are managed via environment variables. Production credentials and JWT signing keys are securely injected at runtime and are never committed to the repository.
+
+| Role | Scope & Privileges |
+| :--- | :--- |
+| `ADMIN` | Full administrative control, projection rebuilds, audit log inspection, management actuator endpoints |
+| `OPERATOR` | Account creation, deposits, withdrawals, account freezing/unfreezing, overdraft and transaction limits |
+| `AUDITOR` | Read-only ledger verification, temporal state inspection (`stateAt`), security audit trail reviews |
 
 ---
 
-## 6. Local Development Credentials (DEV / TEST ONLY)
-
-> [!WARNING]
-> The credentials below are provisioned **strictly for local development and integration testing** when `chronos.security.bootstrap-dev-users: true` is explicitly configured. Production configurations default this property to `false` and require external user directory management.
-
-| Username | Default Password | Assigned Roles | Scope |
-| :--- | :--- | :--- | :--- |
-| `admin` | `AdminSecret123!` | `ROLE_ADMIN` | Full administrative control, projection rebuilds, audit reviews, sensitive actuator access |
-| `operator` | `OperatorSecret123!` | `ROLE_OPERATOR` | Account creation, deposits, withdrawals, freezes, transaction limits |
-| `auditor` | `AuditorSecret123!` | `ROLE_AUDITOR` | Read-only ledger verification, temporal inspector replay, security audit logs |
-
----
-
-## 7. REST API Reference
+## 8. REST API Reference
 
 ### Authentication
 - `POST /api/v1/auth/login` — Authenticate with username and password, returns Bearer JWT with roles and expiration
@@ -218,35 +246,38 @@ When an authenticated operator or admin executes financial commands:
 
 ---
 
-## 8. Swagger UI & Bearer JWT Testing
+## 9. Application Entry Points & Observability
 
-1. Open **Swagger UI**: [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
-2. Expand `POST /api/v1/auth/login`, click **Try it out**, and log in with your credentials (e.g., `operator` / `OperatorSecret123!`).
-3. Copy the returned `token` string from the JSON response.
+### Production (Live Deployment)
+- **Temporal Dashboard UI (React):** https://chronos-frontend-g0m4.onrender.com
+- **Backend REST API:** https://chronos-engine-4mci.onrender.com
+- **Interactive Swagger UI:** https://chronos-engine-4mci.onrender.com/swagger-ui/index.html
+- **Health Check (Public):** https://chronos-engine-4mci.onrender.com/actuator/health
+- **OpenAPI v3 Spec:** https://chronos-engine-4mci.onrender.com/v3/api-docs
+
+### Local Development
+- **Temporal Dashboard UI (React):** http://localhost:5173
+- **Interactive Swagger UI:** http://localhost:8080/swagger-ui/index.html
+- **Health Check:** http://localhost:8080/actuator/health
+- **Application Info:** http://localhost:8080/actuator/info
+- **Operational Metrics (`ADMIN` only):** http://localhost:8080/actuator/metrics
+
+---
+
+## 10. Swagger UI & Bearer JWT Testing
+
+1. Open **Swagger UI**:
+   - Production: [https://chronos-engine-4mci.onrender.com/swagger-ui/index.html](https://chronos-engine-4mci.onrender.com/swagger-ui/index.html)
+   - Local: `http://localhost:8080/swagger-ui/index.html`
+2. Expand `POST /api/v1/auth/login`, click **Try it out**, and submit your authentication credentials.
+3. Copy the returned `accessToken` string from the JSON response.
 4. Click the green **Authorize** button at the top right of the Swagger UI page.
-5. In the **Value** field, paste the token (or `Bearer <token>`) and click **Authorize**.
+5. In the **Value** field, enter `Bearer <token>` and click **Authorize**.
 6. All subsequent command and query endpoints will execute with the authenticated Bearer token.
 
 ---
 
-## 9. Application Entry Points & Observability
-
-### Endpoints & Security Posture
-- **Temporal Dashboard UI (React):** [http://localhost:5173](http://localhost:5173)
-- **Interactive Swagger UI:** [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
-- **Health Check (Public):** [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health)
-- **Application Info (Public):** [http://localhost:8080/actuator/info](http://localhost:8080/actuator/info)
-- **Operational Metrics (`ADMIN` only):** [http://localhost:8080/actuator/metrics](http://localhost:8080/actuator/metrics)
-
-### Security Metrics (Micrometer)
-- `chronos.security.login.success` — Counter of successful user authentications
-- `chronos.security.login.failure` — Counter of failed authentication attempts
-- `chronos.security.access.denied` — Counter of RBAC authorization rejections (HTTP 403)
-- `chronos.security.audit.write.failure` — Counter of failed security audit log persistence attempts
-
----
-
-## 10. Local Execution & Test Guide
+## 11. Local Execution & Test Guide
 
 ### Prerequisites
 - JDK 21
@@ -281,7 +312,7 @@ Once initialized, access the dashboard, Swagger UI, and health check via the URL
 
 ---
 
-## 11. Performance Benchmarking & Scale Validation (Wave 4)
+## 12. Performance Benchmarking & Scale Validation (Wave 4)
 
 Chronos includes an isolated, reproducible performance benchmark harness that empirically measures the engine under growing volume (10k, 50k, 100k events), diverse access patterns, and concurrent load without modifying or bypassing Waves 1–3 correctness, OCC, or security boundaries.
 
@@ -304,7 +335,5 @@ For full methodology, statistical analysis, environment profile, and raw metrics
 
 ---
 
-## 12. License
+## 13. License
 Apache License 2.0. Built for production demonstration and technical portfolio review.
-
-

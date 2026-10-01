@@ -5,3 +5,7 @@ target/
 .project
 .settings/
 .DS_Store
+.neon
+.env
+.env.*
+
