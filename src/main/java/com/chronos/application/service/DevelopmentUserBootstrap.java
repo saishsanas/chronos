@@ -5,6 +5,7 @@ import com.chronos.domain.security.ApplicationUser;
 import com.chronos.domain.security.UserRole;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -31,15 +32,33 @@ public class DevelopmentUserBootstrap implements CommandLineRunner {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final boolean bootstrapEnabled;
+    private final String adminPasswordOverride;
+    private final String operatorPasswordOverride;
+    private final String auditorPasswordOverride;
 
     public DevelopmentUserBootstrap(
         UserRepository userRepository,
         PasswordEncoder passwordEncoder,
-        @Value("${chronos.security.bootstrap-dev-users:false}") boolean bootstrapEnabled
+        boolean bootstrapEnabled
+    ) {
+        this(userRepository, passwordEncoder, bootstrapEnabled, null, null, null);
+    }
+
+    @Autowired
+    public DevelopmentUserBootstrap(
+        UserRepository userRepository,
+        PasswordEncoder passwordEncoder,
+        @Value("${chronos.security.bootstrap-dev-users:false}") boolean bootstrapEnabled,
+        @Value("${chronos.security.bootstrap-dev-users.admin-password:}") String adminPasswordOverride,
+        @Value("${chronos.security.bootstrap-dev-users.operator-password:}") String operatorPasswordOverride,
+        @Value("${chronos.security.bootstrap-dev-users.auditor-password:}") String auditorPasswordOverride
     ) {
         this.userRepository = Objects.requireNonNull(userRepository, "userRepository must not be null");
         this.passwordEncoder = Objects.requireNonNull(passwordEncoder, "passwordEncoder must not be null");
         this.bootstrapEnabled = bootstrapEnabled;
+        this.adminPasswordOverride = adminPasswordOverride;
+        this.operatorPasswordOverride = operatorPasswordOverride;
+        this.auditorPasswordOverride = auditorPasswordOverride;
     }
 
     @Override
@@ -54,26 +73,33 @@ public class DevelopmentUserBootstrap implements CommandLineRunner {
             return;
         }
 
-        log.warn("Bootstrapping development users for local/test execution. NEVER enable in production!");
+        log.info("Bootstrapping users for demo/execution environment.");
+
+        String adminPass = (adminPasswordOverride != null && !adminPasswordOverride.isBlank())
+            ? adminPasswordOverride : DEV_ADMIN_PASSWORD;
+        String operatorPass = (operatorPasswordOverride != null && !operatorPasswordOverride.isBlank())
+            ? operatorPasswordOverride : DEV_OPERATOR_PASSWORD;
+        String auditorPass = (auditorPasswordOverride != null && !auditorPasswordOverride.isBlank())
+            ? auditorPasswordOverride : DEV_AUDITOR_PASSWORD;
 
         ApplicationUser admin = ApplicationUser.createWithId(
             ADMIN_USER_ID,
             "admin",
-            passwordEncoder.encode(DEV_ADMIN_PASSWORD),
+            passwordEncoder.encode(adminPass),
             Set.of(UserRole.ADMIN)
         );
 
         ApplicationUser operator = ApplicationUser.createWithId(
             OPERATOR_USER_ID,
             "operator",
-            passwordEncoder.encode(DEV_OPERATOR_PASSWORD),
+            passwordEncoder.encode(operatorPass),
             Set.of(UserRole.OPERATOR)
         );
 
         ApplicationUser auditor = ApplicationUser.createWithId(
             AUDITOR_USER_ID,
             "auditor",
-            passwordEncoder.encode(DEV_AUDITOR_PASSWORD),
+            passwordEncoder.encode(auditorPass),
             Set.of(UserRole.AUDITOR)
         );
 
@@ -81,6 +107,6 @@ public class DevelopmentUserBootstrap implements CommandLineRunner {
         userRepository.save(operator);
         userRepository.save(auditor);
 
-        log.info("Successfully seeded development users: [admin, operator, auditor]");
+        log.info("Successfully seeded users: [admin, operator, auditor]");
     }
 }

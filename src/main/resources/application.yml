@@ -15,6 +15,8 @@ spring:
     baseline-on-migrate: true
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    listener:
+      auto-startup: ${SPRING_KAFKA_LISTENER_AUTO_STARTUP:true}
   lifecycle:
     timeout-per-shutdown-phase: 20s
 
@@ -32,7 +34,8 @@ chronos:
     allowed-origins: ${CHRONOS_CORS_ALLOWED_ORIGINS:http://localhost:5173}
 
 server:
-  port: ${SERVER_PORT:8080}
+  port: ${PORT:${SERVER_PORT:8080}}
+  address: 0.0.0.0
   shutdown: graceful
 
 management:

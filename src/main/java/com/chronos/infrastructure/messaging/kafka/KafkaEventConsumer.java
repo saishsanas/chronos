@@ -28,7 +28,8 @@ public class KafkaEventConsumer {
     @KafkaListener(
         topics = "${chronos.kafka.topic:chronos.events.v1}",
         groupId = "${chronos.kafka.consumer.group-id:chronos-engine-v1}",
-        containerFactory = "kafkaListenerContainerFactory"
+        containerFactory = "kafkaListenerContainerFactory",
+        autoStartup = "${spring.kafka.listener.auto-startup:true}"
     )
     public void listen(ConsumerRecord<String, String> record, Acknowledgment ack) {
         log.info("Received Kafka record key={}, topic={}, partition={}, offset={}",

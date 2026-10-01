@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: chronos-engine
+    runtime: docker
+    plan: free
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: CHRONOS_BOOTSTRAP_DEV_USERS
+        value: "true"
+      - key: CHRONOS_OPS_PROJECTION_REBUILD_ENABLED
+        value: "true"
+      - key: SPRING_KAFKA_LISTENER_AUTO_STARTUP
+        value: "false"
+      - key: CHRONOS_JWT_SECRET
+        generateValue: true
+      - key: SPRING_DATASOURCE_URL
+        sync: false
+      - key: SPRING_DATASOURCE_USERNAME
+        sync: false
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+      - key: CHRONOS_CORS_ALLOWED_ORIGINS
+        sync: false

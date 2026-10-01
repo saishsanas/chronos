@@ -1,0 +1,14 @@
+spring:
+  kafka:
+    listener:
+      auto-startup: ${SPRING_KAFKA_LISTENER_AUTO_STARTUP:false}
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+
+chronos:
+  ops:
+    projection-rebuild:
+      enabled: ${CHRONOS_OPS_PROJECTION_REBUILD_ENABLED:true}
+  security:
+    bootstrap-dev-users: ${CHRONOS_BOOTSTRAP_DEV_USERS:true}

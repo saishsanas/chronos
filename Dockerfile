@@ -26,6 +26,6 @@ USER chronosuser
 
 EXPOSE 8080
 
-ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=50.0 -XX:+UseSerialGC -Xss512k -XX:MaxMetaspaceSize=128m -Djava.security.egd=file:/dev/./urandom"
 
 ENTRYPOINT ["java", "-jar", "/app/chronos-engine.jar"]
