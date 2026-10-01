@@ -11,6 +11,18 @@ public class TestDatabaseHelper {
     public static final String TEST_JWT_SECRET = "test-deterministic-jwt-secret-key-at-least-32-chars-long!";
 
     public static void configureProperties(DynamicPropertyRegistry registry) {
+        // Allow system property overrides for live remote/container DB testing
+        String sysUrl = System.getProperty("SPRING_DATASOURCE_URL");
+        if (sysUrl != null && !sysUrl.isBlank()) {
+            registry.add("spring.datasource.url", () -> sysUrl);
+            registry.add("spring.datasource.username", () -> System.getProperty("SPRING_DATASOURCE_USERNAME", ""));
+            registry.add("spring.datasource.password", () -> System.getProperty("SPRING_DATASOURCE_PASSWORD", ""));
+            registry.add("spring.flyway.locations", () -> "classpath:db/migration");
+            registry.add("spring.kafka.listener.auto-startup", () -> "false");
+            registry.add("chronos.security.jwt.secret", () -> TEST_JWT_SECRET);
+            registry.add("chronos.security.bootstrap-dev-users", () -> "true");
+            return;
+        }
         String containerUrl = "jdbc:postgresql://localhost:5432/chronos_db";
         String testDbUrl = "jdbc:postgresql://localhost:5432/chronos_test_db";
 

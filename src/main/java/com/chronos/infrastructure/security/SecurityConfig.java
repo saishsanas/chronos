@@ -180,6 +180,7 @@ public class SecurityConfig {
             )
             .authorizeHttpRequests(auth -> auth
                 // 1. Public Authentication & Documentation Endpoints
+                .requestMatchers(HttpMethod.GET, "/").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
